@@ -65,7 +65,7 @@ run0 rm -f /etc/chromium/policies/managed/policies.json
 ```
 
 #### macOS
-```bash
+```zsh
 sudo ./setup.sh
 ```
 Choose **[2] Uninstall** when prompted.
