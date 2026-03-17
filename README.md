@@ -32,8 +32,6 @@ A `policies.json` lets system administrators — and privacy-conscious individua
 The managed policy file path varies by operating system:
 
 - **Linux:** `/etc/chromium/policies/managed/policies.json`
-- **macOS:** `/Library/Managed Preferences/policies.json`
-- **Windows:** `C:\Program Files\Google\Chrome\Application\policies\managed\policies.json`
 
 The filename can be changed, but must have a `.json` extension.
 
@@ -45,18 +43,6 @@ The filename can be changed, but must have a `.json` extension.
 ```bash
 run0 mkdir -p /etc/chromium/policies/managed/
 run0 cp --reflink=auto policies.json /etc/chromium/policies/managed/policies.json
-```
-
-#### MacOS
-```bash
-sudo mkdir -p "/Library/Managed Preferences/"
-sudo cp policies.json "/Library/Managed Preferences/policies.json"
-```
-
-#### Windows
-```powershell
-New-Item -ItemType Directory -Force -Path "C:\Program Files\Google\Chrome\Application\policies\managed"
-Copy-Item policies.json "C:\Program Files\Google\Chrome\Application\policies\managed\policies.json"
 ```
 
 After copying, restart Chromium and verify policies are applied by visiting `chrome://policy`. All entries should show **Source: Platform**, **Level: Mandatory**, and **Status: OK**.
