@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# setup-macos.sh — Install or uninstall chromium-policies.json on macOS
+# setup-macos.sh — Install or uninstall policies.json on macOS
 # Must be run with elevated privileges: sudo ./setup-macos.sh
 
 set -eu
