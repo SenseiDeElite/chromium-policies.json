@@ -33,7 +33,7 @@ A `policies.json` lets system administrators — and privacy-conscious individua
 
 ### 🟦  Installation
 
-Make sure you are in the same directory as policies.json — this file is required for all platforms.
+Make sure that you are in the same directory as policies.json — this file is required for all platforms.
 
 #### Linux
 ```bash
