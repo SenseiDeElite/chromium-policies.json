@@ -1,4 +1,4 @@
-# setup-windows.ps1 — Install or uninstall chromium-policies.json on Windows
+# setup-windows.ps1 — Apply or remove Chromium policies.json on Windows
 # Must be run as Administrator
 #Requires -RunAsAdministrator
 
@@ -6,90 +6,118 @@ $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $JsonPath  = Join-Path $ScriptDir "policies.json"
-$RegPath   = "HKLM:\SOFTWARE\Policies\Google\Chrome"
 
-# ── Prompt ───────────────────────────────────────────────────────────────────
-Write-Host "chromium-policies setup"
+$Targets = @{
+    "Chrome"    = "HKLM:\SOFTWARE\Policies\Google\Chrome"
+    "Chromium"  = "HKLM:\SOFTWARE\Policies\Chromium"
+}
+
+# --- Browser selection ---
+Write-Host "Chromium policies setup"
 Write-Host "-----------------------"
+Write-Host "  [1] Google Chrome"
+Write-Host "  [2] Chromium"
+Write-Host "  [3] All"
+Write-Host ""
+$browser = Read-Host "Target browser [1/2/3]"
+
+switch ($browser) {
+    "1" { $selected = @("Chrome") }
+    "2" { $selected = @("Chromium") }
+    "3" { $selected = @("Chrome", "Chromium") }
+    default {
+        Write-Host "Invalid option. Aborting."
+        exit 1
+    }
+}
+
+# --- Action selection ---
+Write-Host ""
 Write-Host "  [1] Install"
 Write-Host "  [2] Uninstall"
 Write-Host ""
-$choice = Read-Host "Choose an option [1/2]"
+$action = Read-Host "Choose an action [1/2]"
 
-if ($choice -notin @("1", "2")) {
+if ($action -notin @("1", "2")) {
     Write-Host "Invalid option. Aborting."
     exit 1
 }
 
-# ── Uninstall ────────────────────────────────────────────────────────────────
-if ($choice -eq "2") {
-    if (-not (Test-Path $RegPath)) {
-        Write-Host "Nothing to remove — registry key does not exist: $RegPath"
-        exit 0
+# --- Uninstall ---
+if ($action -eq "2") {
+    foreach ($name in $selected) {
+        $RegPath = $Targets[$name]
+        if (-not (Test-Path $RegPath)) {
+            Write-Host "[$name] Nothing to remove - registry key does not exist."
+            continue
+        }
+        $confirm = Read-Host "[$name] Delete all policies from registry? [y/N]"
+        if ($confirm -notmatch "^[Yy]$") {
+            Write-Host "[$name] Skipped."
+            continue
+        }
+        Remove-Item -Path $RegPath -Recurse -Force
+        Write-Host "[$name] Removed: $RegPath"
     }
-    $confirm = Read-Host "This will delete all Chrome policies from the registry. Continue? [y/N]"
-    if ($confirm -notmatch '^[Yy]$') {
-        Write-Host "Aborted."
-        exit 0
-    }
-    Remove-Item -Path $RegPath -Recurse -Force
-    Write-Host "Removed: $RegPath"
-    Write-Host "Restart Chrome and verify at chrome://policy"
+    Write-Host "Restart your Chromium-based browser and verify at chrome://policy"
     exit 0
 }
 
-# ── Install ──────────────────────────────────────────────────────────────────
+# --- Install ---
 if (-not (Test-Path $JsonPath)) {
     Write-Error "policies.json not found at: $JsonPath"
     exit 1
 }
 
-if (Test-Path $RegPath) {
-    $confirm = Read-Host "Chrome policies already exist in the registry. Overwrite? [y/N]"
-    if ($confirm -notmatch '^[Yy]$') {
-        Write-Host "Aborted."
-        exit 0
-    }
-    # Remove first to ensure stale keys from previous installs don't persist
-    Remove-Item -Path $RegPath -Recurse -Force
-    Write-Host "Cleared existing policies."
-}
-
-New-Item -Path $RegPath -Force | Out-Null
-Write-Host "Created registry key: $RegPath"
-
 $policies = Get-Content $JsonPath -Raw | ConvertFrom-Json
 
-$applied = 0
-$skipped = 0
+foreach ($name in $selected) {
+    $RegPath = $Targets[$name]
+    Write-Host ""
+    Write-Host "Applying to $name..."
 
-foreach ($policy in $policies.PSObject.Properties) {
-    $name  = $policy.Name
-    $value = $policy.Value
-
-    try {
-        switch ($value.GetType().Name) {
-            "Boolean" {
-                $dword = if ($value) { 1 } else { 0 }
-                Set-ItemProperty -Path $RegPath -Name $name -Value $dword -Type DWord
-            }
-            "Int64"   { Set-ItemProperty -Path $RegPath -Name $name -Value $value -Type DWord }
-            "Int32"   { Set-ItemProperty -Path $RegPath -Name $name -Value $value -Type DWord }
-            "String"  { Set-ItemProperty -Path $RegPath -Name $name -Value $value -Type String }
-            default {
-                Write-Warning "Skipping '$name': unsupported type '$($value.GetType().Name)'"
-                $skipped++
-                continue
-            }
+    if (Test-Path $RegPath) {
+        $confirm = Read-Host "[$name] Policies already exist. Overwrite? [y/N]"
+        if ($confirm -notmatch "^[Yy]$") {
+            Write-Host "[$name] Skipped."
+            continue
         }
-        Write-Host "  SET  $name = $value"
-        $applied++
-    } catch {
-        Write-Warning "Failed to set '$name': $_"
-        $skipped++
+        Remove-Item -Path $RegPath -Recurse -Force
+        Write-Host "[$name] Cleared existing policies."
     }
+
+    New-Item -Path $RegPath -Force | Out-Null
+
+    $applied = 0
+    $skipped = 0
+
+    foreach ($policy in $policies.PSObject.Properties) {
+        $key   = $policy.Name
+        $value = $policy.Value
+        try {
+            switch ($value.GetType().Name) {
+                "Boolean" {
+                    $dword = if ($value) { 1 } else { 0 }
+                    Set-ItemProperty -Path $RegPath -Name $key -Value $dword -Type DWord
+                }
+                "Int64"  { Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type DWord }
+                "Int32"  { Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type DWord }
+                "String" { Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type String }
+                default {
+                    Write-Warning "Skipping $key - unsupported type"
+                    $skipped++
+                    continue
+                }
+            }
+            Write-Host "  SET  $key = $value"
+            $applied++
+        } catch {
+            Write-Warning "Failed to set $key"
+            $skipped++
+        }
+    }
+    Write-Host "[$name] Done. $applied applied, $skipped skipped."
 }
 
 Write-Host ""
-Write-Host "Done. $applied policies applied, $skipped skipped."
-Write-Host "Restart Chrome and verify at chrome://policy"
+Write-Host "Restart your Chromium-based browser and verify at chrome://policy"
