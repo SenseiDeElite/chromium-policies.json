@@ -44,7 +44,7 @@ run0 cp --reflink=auto policies.json /etc/chromium/policies/managed/policies.jso
 #### macOS (untested)
 Run the interactive setup script:
 ```zsh
-sudo ./setup.sh
+sudo ./setup-macos.sh
 ```
 The script reads `policies.json` from the same directory and writes it as a plist to `/Library/Managed Preferences/com.google.Chrome.plist`. Python 3 is required.
 
