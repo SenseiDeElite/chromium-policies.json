@@ -41,7 +41,7 @@ run0 mkdir -p /etc/chromium/policies/managed/
 run0 cp --reflink=auto policies.json /etc/chromium/policies/managed/policies.json
 ```
 
-#### macOS
+#### macOS (untested)
 Run the interactive setup script:
 ```zsh
 sudo ./setup.sh
@@ -51,7 +51,7 @@ The script reads `policies.json` from the same directory and writes it as a plis
 #### Windows
 Run the interactive setup script from an **Administrator** PowerShell session:
 ```powershell
-.\setup.ps1
+.\setup-windows.ps1
 ```
 The script reads `policies.json` from the same directory and writes each policy as a registry value under `HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome`.
 
