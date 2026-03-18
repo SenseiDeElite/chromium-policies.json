@@ -1,8 +1,8 @@
-### 🟩  chromium-policies.json
+### 🟩  Chromium policies.json
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-`chromium-policies.json` is a **hardened policy template** for Chromium-based browsers, built to maximise privacy and security, strip telemetry, and tighten the attack surface — with the goal of preserving usability wherever possible (though some breakage is expected).
+Chromium `policies.json` is a **hardened policy template** for Chromium-based browsers, built to maximise privacy and security, strip telemetry, and tighten the attack surface — with the goal of preserving usability wherever possible (though some breakage is expected).
 
 Unlike browser extensions or experimental flags, Chromium policies are enforced at the system level and apply to all profiles. This project takes that mechanism and applies it to the same problems that [arkenfox/user.js](https://github.com/arkenfox/user.js) solves for Firefox — but for Google's Chromium. It draws similar inspiration from [ungoogled-software/ungoogled-chromium](https://github.com/ungoogled-software/ungoogled-chromium), achieving comparable hardening through enforced local policies rather than a custom build.
 
@@ -21,7 +21,7 @@ The current template covers:
 
 > 🛡️ **Safe Browsing is disabled** in this configuration as it sends URLs to Google for evaluation, which is a privacy concern. To maintain protection against malicious sites, it is recommended to use [uBlock Origin Lite](https://github.com/uBlockOrigin/uBOL-home) and DNS-level content blocking with filter lists such as [uAssets badware filter](https://github.com/uBlockOrigin/uAssets/blob/master/filters/badware.txt) and [URLhaus malware filter](https://gitlab.com/malware-filter/urlhaus-filter).
 
-> ⚠️ **Fingerprinting notice:** Using this configuration may make you stand out more easily to fingerprinting — unless there are enough other users adopting it too. It can also cause captchas to appear more frequently on websites such as Google or X (formerly Twitter).
+> ⚠️ **Fingerprinting notice:** Using this configuration may make you stand out more easily to fingerprinting — unless there are enough other users adopting it too. It can also trigger captchas and website protection systems more frequently.
 
 ---
 
