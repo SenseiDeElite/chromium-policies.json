@@ -1,5 +1,6 @@
 # setup-windows.ps1 — Apply or remove Chromium policies.json on Windows
 # Must be run as Administrator
+
 #Requires -RunAsAdministrator
 
 $ErrorActionPreference = "Stop"
