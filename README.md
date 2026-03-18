@@ -72,7 +72,7 @@ Choose **[2] Uninstall** when prompted.
 
 #### Windows
 ```powershell
-.\setup.ps1
+powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 ```
 Choose **[2] Uninstall** when prompted.
 
