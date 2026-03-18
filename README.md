@@ -51,7 +51,7 @@ The script reads `policies.json` from the same directory and writes it as a plis
 #### Windows
 Run the interactive setup script from an **Administrator** PowerShell session:
 ```powershell
-.\setup-windows.ps1
+powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 ```
 The script reads `policies.json` from the same directory and writes each policy as a registry value under `HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome`.
 
