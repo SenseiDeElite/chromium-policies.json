@@ -33,8 +33,6 @@ A `policies.json` lets system administrators — and privacy-conscious individua
 
 ### 🟦  Installation
 
-After applying policies, restart Chromium and verify at `chrome://policy`. All entries should show **Source: Platform**, **Level: Mandatory**, and **Status: OK**.
-
 #### Linux
 ```bash
 run0 mkdir -p /etc/chromium/policies/managed/
@@ -54,6 +52,8 @@ Run the interactive setup script from an **Administrator** PowerShell session:
 powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 ```
 The script reads `policies.json` from the same directory and writes each policy as a registry value under `HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome`.
+
+After applying policies, restart Chromium and verify at `chrome://policy`. All entries should show **Source: Platform**, **Level: Mandatory**, and **Status: OK**.
 
 ---
 
