@@ -33,6 +33,8 @@ A `policies.json` lets system administrators — and privacy-conscious individua
 
 ### 🟦  Installation
 
+Make sure you are in the same directory as policies.json - it's required for all platforms.
+
 #### Linux
 ```bash
 run0 mkdir -p /etc/chromium/policies/managed/
@@ -40,18 +42,16 @@ run0 cp --reflink=auto policies.json /etc/chromium/policies/managed/policies.jso
 ```
 
 #### macOS (untested)
-Run the interactive setup script:
+Run the interactive setup script. Python 3 is required.
 ```zsh
 sudo ./setup-macos.sh
 ```
-The script reads `policies.json` from the same directory and writes it as a plist to `/Library/Managed Preferences/com.google.Chrome.plist`. Python 3 is required.
 
 #### Windows
 Run the interactive setup script from an **Administrator** PowerShell session:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 ```
-The script reads `policies.json` from the same directory and writes each policy as a registry value under `HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome`.
 
 After applying policies, restart Chromium and verify at `chrome://policy`. All entries should show **Source: Platform**, **Level: Mandatory**, and **Status: OK**.
 
@@ -68,7 +68,6 @@ run0 rm -f /etc/chromium/policies/managed/policies.json
 ```zsh
 sudo ./setup.sh
 ```
-Choose **[2] Uninstall** when prompted.
 
 #### Windows
 ```powershell
