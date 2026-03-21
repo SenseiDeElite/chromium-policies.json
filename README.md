@@ -41,7 +41,7 @@ run0 mkdir -p /etc/chromium/policies/managed/
 run0 cp --reflink=auto policies.json /etc/chromium/policies/managed/policies.json
 ```
 
-#### macOS (untested)
+#### macOS
 Run the interactive setup script. Python 3 is required.
 ```zsh
 sudo ./setup-macos.sh
