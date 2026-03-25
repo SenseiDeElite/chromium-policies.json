@@ -14,7 +14,7 @@ $Targets = @{
 }
 
 # --- Browser selection ---
-Write-Host "Chromium policies setup"
+Write-Host "Chromium policies.json setup"
 Write-Host "-----------------------"
 Write-Host "  [1] Google Chrome"
 Write-Host "  [2] Chromium"
