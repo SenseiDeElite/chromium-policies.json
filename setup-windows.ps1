@@ -1,5 +1,5 @@
-# setup-windows.ps1 — Apply or remove Chromium policies.json on Windows
-# Must be run as Administrator
+# setup-windows.ps1 — Apply or remove Chromium policies.json on Windows.
+# Must be run from an Administrator PowerShell session.
 
 #Requires -RunAsAdministrator
 
@@ -60,7 +60,7 @@ if ($action -eq "2") {
         Remove-Item -Path $RegPath -Recurse -Force
         Write-Host "[$name] Removed: $RegPath"
     }
-    Write-Host "Restart your Chromium-based browser and verify at chrome://policy"
+    Write-Host "Restart your Chromium-based browser and verify at chrome://policy."
     exit 0
 }
 
@@ -121,4 +121,4 @@ foreach ($name in $selected) {
 }
 
 Write-Host ""
-Write-Host "Restart your Chromium-based browser and verify at chrome://policy"
+Write-Host "Restart your Chromium-based browser and verify at chrome://policy."
