@@ -107,7 +107,6 @@
   "SitePerProcess": true,
   "SpellCheckServiceEnabled": false,
   "SyncDisabled": true,
-  "TLS13EarlyDataEnabled": true,
   "TabCompareSettings": 2,
   "TranslateEnabled": false,
   "UnmanagedDeviceSignalsConsentFlowEnabled": false,
