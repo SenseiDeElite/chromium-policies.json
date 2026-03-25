@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# setup-macos.sh - Apply or remove Chromium policies.json on macOS
+# setup-macos.sh - Apply or remove Chromium policies.json on macOS.
 # Must be run with elevated privileges: sudo ./setup-macos.sh
 
 set -eu
@@ -14,12 +14,12 @@ BROWSERS[Chromium]="org.chromium.Chromium"
 
 # --- Privilege check ---
 if [[ $EUID -ne 0 ]]; then
-    echo "Error: This script must be run with sudo." >&2
+    echo "Error: This script must be run with elevated privileges." >&2
     exit 1
 fi
 
 # --- Browser selection ---
-echo "Chromium policies setup"
+echo "Chromium policies.json setup"
 echo "-----------------------"
 echo "  [1] Google Chrome"
 echo "  [2] Chromium"
@@ -55,7 +55,7 @@ case "$action" in
         ;;
 esac
 
-# --- python3 check (install only) ---
+# --- python3 check ---
 if [[ "$action" == "1" ]]; then
     if [[ ! -f "$JSON_PATH" ]]; then
         echo "Error: policies.json not found at: $JSON_PATH" >&2
@@ -126,4 +126,4 @@ PYEOF
 done
 
 echo ""
-echo "Restart your Chromium-based browser and verify at chrome://policy"
+echo "Restart your Chromium-based browser and verify at chrome://policy."
