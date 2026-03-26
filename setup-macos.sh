@@ -105,7 +105,7 @@ for name in "${selected[@]}"; do
     mkdir -p "$PLIST_DIR"
 
     python3 - "$JSON_PATH" "$plist_path" <<'PYEOF'
-import sys, json, plistlib
+import sys, json, plistlib, os
 from pathlib import Path
 
 json_path  = Path(sys.argv[1])
@@ -119,15 +119,8 @@ policies = {}
 skipped  = []
 
 for key, value in raw.items():
-    if isinstance(value, bool):
-        policies[key] = value                  # plistlib → <true/>/<false/>
-    elif isinstance(value, float):
-        if value.is_integer():
-            policies[key] = int(value)         # coerce 1.0 → 1 → <integer/>
-        else:
-            skipped.append((key, type(value).__name__))
-            continue
-    elif isinstance(value, (int, str)):
+    # bool must be checked before int (bool is a subclass of int in Python)
+    if isinstance(value, (bool, int, str)):
         policies[key] = value
     else:
         skipped.append((key, type(value).__name__))
@@ -137,7 +130,6 @@ for key, value in raw.items():
 try:
     with open(plist_tmp, "wb") as f:
         plistlib.dump(policies, f, fmt=plistlib.FMT_XML, sort_keys=True)
-    import os
     os.replace(plist_tmp, plist_path)
 finally:
     if plist_tmp.exists():
