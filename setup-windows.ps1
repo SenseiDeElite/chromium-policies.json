@@ -1,4 +1,4 @@
-# setup-windows.ps1 — Apply or remove Chromium policies.json on Windows.
+# setup-windows.ps1 — Apply or remove chromium-policies.json on Windows.
 # Must be run from an Administrator PowerShell session.
 
 #Requires -RunAsAdministrator
@@ -14,7 +14,7 @@ $Targets = @{
 }
 
 # --- Browser selection ---
-Write-Host "Chromium policies.json setup"
+Write-Host "chromium-policies.json setup"
 Write-Host "-----------------------"
 Write-Host "  [1] Google Chrome"
 Write-Host "  [2] Chromium"
