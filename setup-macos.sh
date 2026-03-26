@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# setup-macos.sh - Apply or remove Chromium policies.json on macOS.
+# setup-macos.sh - Apply or remove chromium-policies.json on macOS.
 # Must be run with elevated privileges: sudo ./setup-macos.sh
 
 set -eu
@@ -19,14 +19,14 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # --- Browser selection ---
-echo "Chromium policies.json setup"
+echo "chromium-policies.json setup"
 echo "-----------------------"
 echo "  [1] Google Chrome"
 echo "  [2] Chromium"
 echo "  [3] All"
 echo ""
 printf "Target browser [1/2/3]: "
-read -r browser
+read -r browser </dev/tty
 
 case "$browser" in
     1) selected=(Chrome) ;;
@@ -44,19 +44,19 @@ echo "  [1] Install"
 echo "  [2] Uninstall"
 echo ""
 printf "Choose an action [1/2]: "
-read -r action
+read -r action </dev/tty
 
 case "$action" in
-    1) ;;
-    2) ;;
+    1) do_install=true ;;
+    2) do_install=false ;;
     *)
         echo "Invalid option. Aborting."
         exit 1
         ;;
 esac
 
-# --- python3 check ---
-if [[ "$action" == "1" ]]; then
+# --- Pre-flight checks for install ---
+if $do_install; then
     if [[ ! -f "$JSON_PATH" ]]; then
         echo "Error: policies.json not found at: $JSON_PATH" >&2
         exit 1
@@ -76,13 +76,13 @@ for name in "${selected[@]}"; do
     echo "Processing $name ($bundle_id)..."
 
     # Uninstall
-    if [[ "$action" == "2" ]]; then
+    if ! $do_install; then
         if [[ ! -f "$plist_path" ]]; then
             echo "[$name] Nothing to remove - plist does not exist."
             continue
         fi
         printf "[%s] Delete policies at %s? [y/N] " "$name" "$plist_path"
-        read -r confirm
+        read -r confirm </dev/tty
         if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
             echo "[$name] Skipped."
             continue
@@ -95,7 +95,7 @@ for name in "${selected[@]}"; do
     # Install
     if [[ -f "$plist_path" ]]; then
         printf "[%s] Policies already exist. Overwrite? [y/N] " "$name"
-        read -r confirm
+        read -r confirm </dev/tty
         if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
             echo "[$name] Skipped."
             continue
@@ -110,18 +110,55 @@ from pathlib import Path
 
 json_path  = Path(sys.argv[1])
 plist_path = Path(sys.argv[2])
+plist_tmp  = plist_path.with_suffix(".tmp")
 
 with open(json_path) as f:
-    policies = json.load(f)
+    raw = json.load(f)
 
-with open(plist_path, "wb") as f:
-    plistlib.dump(policies, f, fmt=plistlib.FMT_XML, sort_keys=True)
+policies = {}
+skipped  = []
+
+for key, value in raw.items():
+    if isinstance(value, bool):
+        policies[key] = value                  # plistlib → <true/>/<false/>
+    elif isinstance(value, float):
+        if value.is_integer():
+            policies[key] = int(value)         # coerce 1.0 → 1 → <integer/>
+        else:
+            skipped.append((key, type(value).__name__))
+            continue
+    elif isinstance(value, (int, str)):
+        policies[key] = value
+    else:
+        skipped.append((key, type(value).__name__))
+        continue
+    print(f"  SET  {key} = {value}")
+
+try:
+    with open(plist_tmp, "wb") as f:
+        plistlib.dump(policies, f, fmt=plistlib.FMT_XML, sort_keys=True)
+    import os
+    os.replace(plist_tmp, plist_path)
+finally:
+    if plist_tmp.exists():
+        plist_tmp.unlink(missing_ok=True)
 
 print(f"Written {len(policies)} policies to {plist_path}")
+if skipped:
+    for k, t in skipped:
+        print(f"  SKIPPED  {k} ({t}) - unsupported type", file=sys.stderr)
 PYEOF
 
     chown root:wheel "$plist_path"
     chmod 644 "$plist_path"
+
+    # Validate the plist is well-formed
+    if ! plutil -lint "$plist_path" &>/dev/null; then
+        echo "[$name] Error: plist validation failed. Removing corrupt file." >&2
+        rm -f "$plist_path"
+        exit 1
+    fi
+
     echo "[$name] Done."
 done
 
