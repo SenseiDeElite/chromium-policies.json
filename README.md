@@ -6,7 +6,7 @@ A `policies.json` lets system administrators manage Chromium settings at the pol
 
 ### 🟩  chromium-policies.json
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/SenseiDeElite/chromium-policies.json/blob/main/LICENSE)
 
 `chromium-policies.json` is a hardened policy file for Chromium-based browsers, built to maximise security and privacy, including stripping telemetry, and tightening the attack surface — with the goal of preserving usability wherever possible (though some breakage is expected).
 
