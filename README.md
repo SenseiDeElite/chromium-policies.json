@@ -1,10 +1,4 @@
-### 🟪  policies.json
-
-A `policies.json` lets system administrators manage Chromium settings at the policy layer. Changes made here take precedence over user-facing preferences.
-
----
-
-## 🟩  chromium-policies.json
+## 🟪  chromium-policies.json
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/SenseiDeElite/chromium-policies.json/blob/main/LICENSE)
 
