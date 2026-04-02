@@ -4,7 +4,7 @@ A `policies.json` lets system administrators manage Chromium settings at the pol
 
 ---
 
-### 🟩  chromium-policies.json
+## 🟩  chromium-policies.json
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/SenseiDeElite/chromium-policies.json/blob/main/LICENSE)
 
@@ -40,16 +40,16 @@ run0 mkdir -p /etc/chromium/policies/managed/
 run0 cp --reflink=auto policies.json /etc/chromium/policies/managed/policies.json
 ```
 
-#### macOS
-Run the interactive setup script. Python 3 is required.
-```zsh
-sudo ./setup-macos.sh
-```
-
 #### Windows
 Run the interactive setup script from an Administrator PowerShell session:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
+```
+
+#### macOS
+Run the interactive setup script. Python 3 is required.
+```zsh
+sudo ./setup-macos.sh
 ```
 
 After applying policies, restart your Chromium-based browser and verify at `chrome://policy`. All entries should show **Source: Platform**, **Level: Mandatory**, and **Status: OK**.
@@ -63,14 +63,14 @@ After applying policies, restart your Chromium-based browser and verify at `chro
 run0 rm -f /etc/chromium/policies/managed/policies.json
 ```
 
-#### macOS
-```zsh
-sudo ./setup-macos.sh
-```
-
 #### Windows
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
+```
+
+#### macOS
+```zsh
+sudo ./setup-macos.sh
 ```
 Choose **[2] Uninstall** when prompted.
 
