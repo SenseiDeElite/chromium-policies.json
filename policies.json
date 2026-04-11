@@ -75,7 +75,6 @@
   "PasswordSharingEnabled": false,
   "PaymentMethodQueryEnabled": false,
   "PdfUseSkiaRendererEnabled": true,
-  "PostQuantumKeyAgreementEnabled": true,
   "PrintPreviewUseSystemDefaultPrinter": true,
   "PrivacySandboxPromptEnabled": false,
   "PromotionsEnabled": false,
