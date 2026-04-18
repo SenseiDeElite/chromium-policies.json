@@ -28,19 +28,19 @@ The current template covers:
 
 First, download and make sure that you are in the same directory as `policies.json` — this file is required for all platforms.
 
-#### Linux
+#### 🐧 Linux
 ```bash
 run0 mkdir -p /etc/chromium/policies/managed/
 run0 cp --reflink=auto policies.json /etc/chromium/policies/managed/policies.json
 ```
 
-#### Windows
+#### 🪟 Windows
 Run the interactive setup script from an Administrator PowerShell session:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 ```
 
-#### macOS
+#### 🍎 macOS
 Run the interactive setup script. Python 3 is required.
 ```zsh
 sudo ./setup-macos.sh
@@ -52,17 +52,17 @@ After applying policies, restart your Chromium-based browser and verify at `chro
 
 ### 🟥  Uninstallation
 
-#### Linux
+#### 🐧 Linux
 ```bash
 run0 rm -f /etc/chromium/policies/managed/policies.json
 ```
 
-#### Windows
+#### 🪟 Windows
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 ```
 
-#### macOS
+#### 🍎 macOS
 ```zsh
 sudo ./setup-macos.sh
 ```
