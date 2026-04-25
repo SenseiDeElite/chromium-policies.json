@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # setup-linux.sh – Apply or remove chromium-policies.json on Linux.
 # Must be run with elevated privileges: run0 ./setup-linux.sh 
-# or other appropriate privilege elevation command.
+# You can also try sudo-rs, doas, pkexec, sudo and su if run0 (systemd) isn't available.
 
 set -eu
 
@@ -12,18 +12,19 @@ JSON_PATH="$SCRIPT_DIR/policies.json"
 SKIP=false
 
 # Browser display order (used for menu and range parsing)
-BROWSER_NAMES=("Chromium and Vivaldi" "Chrome" "Edge")
+BROWSER_NAMES=("Chromium/Vivaldi" "Chrome" "Edge" "Brave")
 
-# Browser name -> policy directory
-# Vivaldi reads from /etc/chromium/policies/managed/ on Linux, same as Chromium.
+# Browser name maps to the policy directory
+# Both Chromium and Vivaldi read from /etc/chromium/policies/managed/ on Linux
 declare -A POLICY_DIRS
-POLICY_DIRS["Chromium and Vivaldi"]="/etc/chromium/policies/managed"
+POLICY_DIRS["Chromium/Vivaldi"]="/etc/chromium/policies/managed"
 POLICY_DIRS["Chrome"]="/etc/opt/chrome/policies/managed"
 POLICY_DIRS["Edge"]="/etc/opt/microsoft/msedge/policies/managed"
+POLICY_DIRS["Brave"]="/etc/brave/policies/managed"
 
 # --- Usage ---
 usage() {
-    echo "Usage: $0 [-s]"
+    echo "Usage: $0 [options...]"
     echo ""
     echo "Options:"
     echo " -s, --skip Skip remote policies.json fetch"
@@ -47,7 +48,7 @@ done
 if [[ "${EUID:-"$(id -u)"}" -ne 0 ]]; then
     echo "This setup script must be run with elevated privileges:" >&2
     echo "run0 ./setup-linux.sh" >&2
-    echo "or other appropriate privilege elevation command." >&2
+    echo "You can also try sudo-rs, doas, pkexec, sudo and su if run0 (systemd) isn't available." >&2
     exit 1
 fi
 
@@ -59,13 +60,13 @@ if [[ ! -f "$JSON_PATH" ]]; then
         exit 1
     fi
 
-    if ! which curl &>/dev/null; then
-        echo "Error: curl is not installed. Install it and retry, or download policies.json manually:" >&2
+    if ! command -v curl &>/dev/null; then
+        echo "Error: curl is not installed. Install it and try again, or download policies.json manually:" >&2
         echo "       $REMOTE_URL" >&2
         exit 1
     fi
 
-    echo "No policies.json found in script directory."
+    echo "No policies.json found in the script directory."
     echo "Remote: $REMOTE_URL"
     read -r -p "Fetch policies.json from remote? [y/N] " confirm </dev/tty
     if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
@@ -86,7 +87,7 @@ if [[ ! -f "$JSON_PATH" ]]; then
 fi
 
 # --- Parse selection input into browser names ---
-# Accepts: single (1), comma-separated (1,2,3), ranges (1-3), or mixed (1,2-3).
+# Accepts: single (1), comma-separated (1,2), ranges (1-3), or mixed (1,2-4).
 parse_selection() {
     local input="$1"
     local max="$2"
@@ -131,11 +132,10 @@ parse_selection() {
 echo ""
 echo "chromium-policies.json setup"
 echo "----------------------------"
-echo " [1] Chromium and Vivaldi"
+echo " [1] Chromium/Vivaldi"
 echo " [2] Google Chrome"
 echo " [3] Microsoft Edge"
-echo ""
-echo " Select one or more: single (1), comma-separated (1,2,3), or range (1-3)"
+echo " [4] Brave"
 echo ""
 read -r -p "Target browser(s): " browser_input </dev/tty
 
