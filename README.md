@@ -31,6 +31,7 @@ First, download and make sure that you are in the same directory as `policies.js
 The setup script will prompt you to use `curl` to fetch it in case it's not already there.
 
 #### 🐧 Linux
+Run the interactive setup script:
 ```bash
 run0 setup-linux.sh
 ```
@@ -53,21 +54,7 @@ After applying policies, restart your Chromium-based browser and verify at `chro
 
 ### 🟥  Uninstallation
 
-#### 🐧 Linux
-```bash
-run0 setup-linux.sh
-```
-
-#### 🪟 Windows
-```powershell
-powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
-```
-
-#### 🍎 macOS
-```zsh
-sudo ./setup-macos.sh
-```
-Choose **Uninstall** when prompted.
+Just run the same setup script again, then choose **Uninstall** when prompted.
 
 ---
 
