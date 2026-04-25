@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup-linux.sh - Apply or remove chromium-policies.json on Linux.
+# setup-linux.sh – Apply or remove chromium-policies.json on Linux.
 # Must be run with elevated privileges: run0 ./setup-linux.sh 
 # or other appropriate privilege elevation command.
 
