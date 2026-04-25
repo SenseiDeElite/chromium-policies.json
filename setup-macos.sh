@@ -12,17 +12,18 @@ PLIST_DIR="/Library/Managed Preferences"
 SKIP=false
 
 # Browser display order (used for menu and range parsing)
-BROWSER_NAMES=(Chrome Chromium Edge Vivaldi)
+BROWSER_NAMES=(Chrome Chromium Edge Vivaldi Brave)
 
 declare -A BROWSERS
 BROWSERS[Chrome]="com.google.Chrome"
 BROWSERS[Chromium]="org.chromium.Chromium"
 BROWSERS[Edge]="com.microsoft.Edge"
 BROWSERS[Vivaldi]="com.vivaldi.Vivaldi"
+BROWSERS[Brave]="com.brave.Browser"
 
 # --- Usage ---
 usage() {
-    echo "Usage: $0 [-s]"
+    echo "Usage: $0 [options...]"
     echo ""
     echo "Options:"
     echo " -s, --skip Skip remote policies.json fetch"
@@ -79,7 +80,7 @@ if [[ ! -f "$JSON_PATH" ]]; then
 fi
 
 # --- Parse selection input into browser names ---
-# Accepts: single (1), comma-separated (1,2,3), ranges (1-3), or mixed (1,2-3).
+# Accepts: single (1), comma-separated (1,2), ranges (1-3), or mixed (1,2-5).
 parse_selection() {
     local input="$1"
     local max="$2"
@@ -129,8 +130,7 @@ echo " [1] Google Chrome"
 echo " [2] Chromium"
 echo " [3] Microsoft Edge"
 echo " [4] Vivaldi"
-echo ""
-echo " Select one or more: single (1), comma-separated (1,2,3), or range (1-3)"
+echo " [5] Brave"
 echo ""
 printf "Target browser(s): "
 read -r browser_input </dev/tty
@@ -143,8 +143,8 @@ fi
 
 # --- Action selection ---
 echo ""
-echo "  [1] Install"
-echo "  [2] Uninstall"
+echo " [1] Install"
+echo " [2] Uninstall"
 echo ""
 printf "Choose an action [1/2]: "
 read -r action </dev/tty
@@ -219,7 +219,7 @@ for key, value in raw.items():
     else:
         skipped.append((key, type(value).__name__))
         continue
-    print(f"  SET  {key} = {value}")
+    print(f" SET {key} = {value}")
 
 try:
     with open(plist_tmp, "wb") as f:
@@ -232,7 +232,7 @@ finally:
 print(f"Written {len(policies)} policies to {plist_path}")
 if skipped:
     for k, t in skipped:
-        print(f"  SKIPPED  {k} ({t}) - unsupported type", file=sys.stderr)
+        print(f" SKIPPED {k} ({t}) – unsupported type", file=sys.stderr)
 PYEOF
 
     chown root:wheel "$plist_path"
