@@ -46,9 +46,9 @@ done
 
 # --- Privilege check ---
 if [[ "${EUID:-"$(id -u)"}" -ne 0 ]]; then
-    echo "This setup script must be run with elevated privileges:" >&2
-    echo "run0 ./setup-linux.sh" >&2
-    echo "You can also try sudo-rs, doas, pkexec, sudo and su if run0 (systemd) isn't available." >&2
+    echo "Error: This setup script must be run with elevated privileges:" >&2
+    echo "       run0 ./setup-linux.sh" >&2
+    echo "       You can also try sudo-rs, doas, pkexec, sudo and su if run0 (systemd) isn't available." >&2
     exit 1
 fi
 
