@@ -36,7 +36,7 @@ Run the interactive setup script with elevated privileges:
 run0 setup-linux.sh
 ```
 
-You can also try `sudo-rs`, `doas`, `pkexec`, `sudo` and `su` if `run0` isn't available.
+You can also try `sudo-rs`, `doas`, `pkexec`, `sudo` and `su` if `run0` (systemd) isn't available.
 
 #### 🪟 Windows
 Run the interactive setup script from an Administrator PowerShell session:
