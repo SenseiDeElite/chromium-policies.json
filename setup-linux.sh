@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# setup-linux.sh - Apply or remove policies.json on Linux.
-# Must be run with elevated privileges: sudo ./setup-linux.sh or run0 ./setup-linux.sh
+# setup-linux.sh - Apply or remove chromium-policies.json on Linux.
+# Must be run with elevated privileges: run0 ./setup-linux.sh 
+# or other appropriate privilege elevation command.
 
 set -eu
 
@@ -11,12 +12,12 @@ JSON_PATH="$SCRIPT_DIR/policies.json"
 SKIP=false
 
 # Browser display order (used for menu and range parsing)
-BROWSER_NAMES=("Chromium/Vivaldi" "Chrome" "Edge")
+BROWSER_NAMES=("Chromium and Vivaldi" "Chrome" "Edge")
 
 # Browser name -> policy directory
 # Vivaldi reads from /etc/chromium/policies/managed/ on Linux, same as Chromium.
 declare -A POLICY_DIRS
-POLICY_DIRS["Chromium/Vivaldi"]="/etc/chromium/policies/managed"
+POLICY_DIRS["Chromium and Vivaldi"]="/etc/chromium/policies/managed"
 POLICY_DIRS["Chrome"]="/etc/opt/chrome/policies/managed"
 POLICY_DIRS["Edge"]="/etc/opt/microsoft/msedge/policies/managed"
 
@@ -25,7 +26,8 @@ usage() {
     echo "Usage: $0 [-s]"
     echo ""
     echo "Options:"
-    echo "  -s, --skip    Skip remote fetch, require local policies.json"
+    echo " -s, --skip Skip remote policies.json fetch"
+    echo " -h, --help Displays this help message"
     exit 1
 }
 
@@ -43,8 +45,9 @@ done
 
 # --- Privilege check ---
 if [[ "${EUID:-"$(id -u)"}" -ne 0 ]]; then
-    echo "Error: This script must be run with elevated privileges." >&2
-    echo "       Use: sudo ./setup-linux.sh  or  run0 ./setup-linux.sh" >&2
+    echo "This setup script must be run with elevated privileges:" >&2
+    echo "run0 ./setup-linux.sh" >&2
+    echo "or other appropriate privilege elevation command." >&2
     exit 1
 fi
 
@@ -56,7 +59,7 @@ if [[ ! -f "$JSON_PATH" ]]; then
         exit 1
     fi
 
-    if ! command -v curl &>/dev/null; then
+    if ! which curl &>/dev/null; then
         echo "Error: curl is not installed. Install it and retry, or download policies.json manually:" >&2
         echo "       $REMOTE_URL" >&2
         exit 1
@@ -83,7 +86,7 @@ if [[ ! -f "$JSON_PATH" ]]; then
 fi
 
 # --- Parse selection input into browser names ---
-# Accepts: single (1), comma-separated (1,3), ranges (1-3), or mixed (1,2-3)
+# Accepts: single (1), comma-separated (1,2,3), ranges (1-3), or mixed (1,2-3).
 parse_selection() {
     local input="$1"
     local max="$2"
@@ -127,12 +130,12 @@ parse_selection() {
 # --- Browser selection ---
 echo ""
 echo "chromium-policies.json setup"
-echo "-----------------------------"
-echo "  [1] Chromium / Vivaldi"
-echo "  [2] Google Chrome"
-echo "  [3] Microsoft Edge"
+echo "----------------------------"
+echo " [1] Chromium and Vivaldi"
+echo " [2] Google Chrome"
+echo " [3] Microsoft Edge"
 echo ""
-echo "  Select one or more: single (1), comma-separated (1,3), or range (1-3)"
+echo " Select one or more: single (1), comma-separated (1,2,3), or range (1-3)"
 echo ""
 read -r -p "Target browser(s): " browser_input </dev/tty
 
@@ -144,8 +147,8 @@ fi
 
 # --- Action selection ---
 echo ""
-echo "  [1] Install"
-echo "  [2] Uninstall"
+echo " [1] Install"
+echo " [2] Uninstall"
 echo ""
 read -r -p "Choose an action [1/2]: " action </dev/tty
 
@@ -159,6 +162,7 @@ case "$action" in
 esac
 
 # --- Process each selected browser ---
+changed=false
 for name in "${selected[@]}"; do
     policy_dir="${POLICY_DIRS[$name]}"
     policy_dest="$policy_dir/policies.json"
@@ -169,7 +173,7 @@ for name in "${selected[@]}"; do
     # Uninstall
     if [[ "$do_install" == false ]]; then
         if [[ ! -f "$policy_dest" ]]; then
-            echo "[$name] Nothing to remove - $policy_dest does not exist."
+            echo "[$name] Nothing to remove – $policy_dest does not exist."
             continue
         fi
         read -r -p "[$name] Delete policies at $policy_dest? [y/N] " confirm </dev/tty
@@ -179,6 +183,7 @@ for name in "${selected[@]}"; do
         fi
         rm -f "$policy_dest"
         echo "[$name] Removed: $policy_dest"
+        changed=true
         continue
     fi
 
@@ -197,7 +202,10 @@ for name in "${selected[@]}"; do
     chmod 644 "$policy_dest"
 
     echo "[$name] Installed: $policy_dest"
+    changed=true
 done
 
-echo ""
-echo "Restart your Chromium-based browser and verify at chrome://policy."
+if [[ "$changed" == true ]]; then
+    echo ""
+    echo "Restart your Chromium-based browser and verify at chrome://policy."
+fi
