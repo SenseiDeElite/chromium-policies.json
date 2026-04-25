@@ -15,17 +15,18 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $JsonPath  = Join-Path $ScriptDir "policies.json"
 
 # Browser display order (used for menu and range parsing)
-$BrowserNames = @("Chrome", "Chromium", "Edge", "Vivaldi")
+$BrowserNames = @("Chrome", "Chromium", "Edge", "Vivaldi", "Brave")
 
 $Targets = @{
     "Chrome"   = "HKLM:\SOFTWARE\Policies\Google\Chrome"
     "Chromium" = "HKLM:\SOFTWARE\Policies\Chromium"
     "Edge"     = "HKLM:\SOFTWARE\Policies\Microsoft\Edge"
     "Vivaldi"  = "HKLM:\SOFTWARE\Policies\Vivaldi"
+    "Brave"    = "HKLM:\SOFTWARE\Policies\BraveSoftware\Brave"
 }
 
 # --- Parse selection input into browser names ---
-# Accepts: single (1), comma-separated (1,3), ranges (1-3), or mixed (1,2-3)
+# Accepts: single (1), comma-separated (1,2), ranges (1-3), or mixed (1,2-5)
 function Parse-Selection {
     param([string]$Input, [int]$Max)
 
@@ -88,7 +89,7 @@ if (-not (Test-Path $JsonPath)) {
         exit 1
     }
 
-    Write-Host "No policies.json found in script directory."
+    Write-Host "No policies.json found in the script directory."
     Write-Host "Remote: $RemoteUrl"
     $confirm = Read-Host "Fetch policies.json from remote? [y/N]"
     if ($confirm -notmatch "^[Yy]$") {
@@ -119,8 +120,7 @@ Write-Host "  [1] Google Chrome"
 Write-Host "  [2] Chromium"
 Write-Host "  [3] Microsoft Edge"
 Write-Host "  [4] Vivaldi"
-Write-Host ""
-Write-Host "  Select one or more: single (1), comma-separated (1,2,3), or range (1-3)"
+Write-Host "  [5] Brave"
 Write-Host ""
 $browserInput = Read-Host "Target browser(s)"
 
@@ -149,7 +149,7 @@ if ($action -eq "2") {
     foreach ($name in $selected) {
         $RegPath = $Targets[$name]
         if (-not (Test-Path $RegPath)) {
-            Write-Host "[$name] Nothing to remove - registry key does not exist."
+            Write-Host "[$name] Nothing to remove – registry key does not exist."
             continue
         }
         $confirm = Read-Host "[$name] Delete all policies from registry? [y/N]"
@@ -199,12 +199,12 @@ if ($action -eq "2") {
                     "Int32"  { Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type DWord }
                     "String" { Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type String }
                     default {
-                        Write-Warning "Skipping $key - unsupported type"
+                        Write-Warning "Skipping $key – unsupported type"
                         $skipped++
                         continue
                     }
                 }
-                Write-Host "  SET  $key = $value"
+                Write-Host " SET $key = $value"
                 $applied++
             } catch {
                 Write-Error "Failed to set ${key}: $_"
