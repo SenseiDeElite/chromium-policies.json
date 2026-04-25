@@ -28,7 +28,7 @@ The current template covers:
 
 First, download and make sure that you are in the same directory as `policies.json` — this file is required for all platforms.
 
-The setup script will use `curl` to fetch it in case it's not already there.
+The setup script will prompt you to use `curl` to fetch it in case it's not already there.
 
 #### 🐧 Linux
 ```bash
