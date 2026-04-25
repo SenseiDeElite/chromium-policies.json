@@ -142,6 +142,8 @@ if ($action -notin @("1", "2")) {
     exit 1
 }
 
+$changed = $false
+
 # --- Uninstall ---
 if ($action -eq "2") {
     foreach ($name in $selected) {
@@ -157,63 +159,64 @@ if ($action -eq "2") {
         }
         Remove-Item -Path $RegPath -Recurse -Force
         Write-Host "[$name] Removed: $RegPath"
+        $changed = $true
     }
+} else {
+    # --- Install ---
+    $policies = Get-Content $JsonPath -Raw | ConvertFrom-Json
+
+    foreach ($name in $selected) {
+        $RegPath = $Targets[$name]
+        Write-Host ""
+        Write-Host "Processing $name..."
+
+        # Confirm overwrite if registry key already exists
+        if (Test-Path $RegPath) {
+            $confirm = Read-Host "[$name] Policies already exist. Overwrite? [y/N]"
+            if ($confirm -notmatch "^[Yy]$") {
+                Write-Host "[$name] Skipped."
+                continue
+            }
+            Remove-Item -Path $RegPath -Recurse -Force
+            Write-Host "[$name] Cleared existing policies."
+        }
+
+        New-Item -Path $RegPath -Force | Out-Null
+
+        $applied = 0
+        $skipped = 0
+
+        foreach ($policy in $policies.PSObject.Properties) {
+            $key   = $policy.Name
+            $value = $policy.Value
+            try {
+                switch ($value.GetType().Name) {
+                    "Boolean" {
+                        $dword = if ($value) { 1 } else { 0 }
+                        Set-ItemProperty -Path $RegPath -Name $key -Value $dword -Type DWord
+                    }
+                    "Int64"  { Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type DWord }
+                    "Int32"  { Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type DWord }
+                    "String" { Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type String }
+                    default {
+                        Write-Warning "Skipping $key - unsupported type"
+                        $skipped++
+                        continue
+                    }
+                }
+                Write-Host "  SET  $key = $value"
+                $applied++
+            } catch {
+                Write-Error "Failed to set ${key}: $_"
+                $skipped++
+            }
+        }
+        Write-Host "[$name] Done. $applied applied, $skipped skipped."
+        $changed = $true
+    }
+}
+
+if ($changed) {
     Write-Host ""
     Write-Host "Restart your Chromium-based browser and verify at chrome://policy."
-    exit 0
 }
-
-# --- Install ---
-$policies = Get-Content $JsonPath -Raw | ConvertFrom-Json
-
-foreach ($name in $selected) {
-    $RegPath = $Targets[$name]
-    Write-Host ""
-    Write-Host "Processing $name..."
-
-    # Confirm overwrite if registry key already exists
-    if (Test-Path $RegPath) {
-        $confirm = Read-Host "[$name] Policies already exist. Overwrite? [y/N]"
-        if ($confirm -notmatch "^[Yy]$") {
-            Write-Host "[$name] Skipped."
-            continue
-        }
-        Remove-Item -Path $RegPath -Recurse -Force
-        Write-Host "[$name] Cleared existing policies."
-    }
-
-    New-Item -Path $RegPath -Force | Out-Null
-
-    $applied = 0
-    $skipped = 0
-
-    foreach ($policy in $policies.PSObject.Properties) {
-        $key   = $policy.Name
-        $value = $policy.Value
-        try {
-            switch ($value.GetType().Name) {
-                "Boolean" {
-                    $dword = if ($value) { 1 } else { 0 }
-                    Set-ItemProperty -Path $RegPath -Name $key -Value $dword -Type DWord
-                }
-                "Int64"  { Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type DWord }
-                "Int32"  { Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type DWord }
-                "String" { Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type String }
-                default {
-                    Write-Warning "Skipping $key - unsupported type"
-                    $skipped++
-                    continue
-                }
-            }
-            Write-Host "  SET  $key = $value"
-            $applied++
-        } catch {
-            Write-Error "Failed to set ${key}: $_"
-            $skipped++
-        }
-    }
-    Write-Host "[$name] Done. $applied applied, $skipped skipped."
-}
-
-Write-Host ""
-Write-Host "Restart your Chromium-based browser and verify at chrome://policy."
