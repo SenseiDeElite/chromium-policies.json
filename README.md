@@ -2,9 +2,9 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/SenseiDeElite/chromium-policies.json/blob/main/LICENSE)
 
-`chromium-policies.json` is a hardened policy file for Chromium-based browsers, built to maximise security and privacy, including stripping telemetry, and tightening the attack surface – with the goal of preserving usability wherever possible (though some breakage is expected).
+`chromium-policies.json` is a policy file for Chromium-based browsers, built to maximise security and privacy, including stripping telemetry, and tightening the attack surface – with the goal of preserving usability wherever possible (though some breakage is expected).
 
-Unlike browser extensions or experimental flags, policies are enforced at the system level and apply to all profiles. This project takes that mechanism and applies it to the same problems that [arkenfox/user.js](https://github.com/arkenfox/user.js) solves for Firefox – but for Google's Chromium. It draws similar inspiration from [ungoogled-software/ungoogled-chromium](https://github.com/ungoogled-software/ungoogled-chromium), achieving comparable hardening through enforced local policies rather than a custom build.
+Unlike browser extensions or experimental flags, policies are enforced at the system level and apply to all profiles. This project takes that mechanism and employs it to the same problems that [arkenfox/user.js](https://github.com/arkenfox/user.js) solves for Firefox – but for Google's Chromium. It draws similar inspiration from [ungoogled-software/ungoogled-chromium](https://github.com/ungoogled-software/ungoogled-chromium), achieving comparable hardening through local policies rather than a custom build.
 
 The current template covers:
 
@@ -20,21 +20,23 @@ The current template covers:
 
 > 🛡️ **Safe Browsing is disabled** in this configuration as it sends URLs to Google for evaluation, which is a privacy concern. To maintain protection against malicious sites, it is recommended to use [uBlock Origin Lite](https://github.com/uBlockOrigin/uBOL-home) and DNS-level content blocking with filter lists such as [uAssets badware filter](https://github.com/uBlockOrigin/uAssets/blob/master/filters/badware.txt) and [URLhaus malware filter](https://gitlab.com/malware-filter/urlhaus-filter).
 
-> 🫆 **Fingerprinting notice:** Using this configuration may make you stand out more easily to fingerprinting – unless there are enough other users adopting it too. It can also trigger captchas and website protection systems more frequently.
+> 🫆 **Fingerprinting notice:** Using this configuration may make you stand out more easily to fingerprinting – unless there are enough users adopting it too.
 
 ---
 
 ### ⬇️ Installation
 
-First, download and make sure that you are in the same directory as `policies.json` – this file is required for all platforms.
+Download and make sure that you are in the same directory as [`policies.json`](https://github.com/SenseiDeElite/chromium-policies.json/blob/main/policies.json) – this file is required for all platforms.
 
-The setup script will prompt you to use [curl](https://github.com/curl/curl) to fetch it in case it's not already there.
+The setup script will prompt you to use [curl](https://github.com/curl/curl) to fetch it in case it's not already there. It should be available in all supported platforms by default.
 
 #### 🐧 Linux
-Run the interactive setup script:
+Run the interactive setup script with elevated privileges:
 ```bash
 run0 setup-linux.sh
 ```
+
+You can also try `sudo-rs`, `doas`, `pkexec`, `sudo` and `su` if `run0` isn't available.
 
 #### 🪟 Windows
 Run the interactive setup script from an Administrator PowerShell session:
@@ -43,7 +45,7 @@ powershell -ExecutionPolicy Bypass -File .\setup-windows.ps1
 ```
 
 #### 🍎 macOS
-Run the interactive setup script. Python 3 is required.
+Run the interactive setup script with elevated privileges. Python 3 is required.
 ```zsh
 sudo ./setup-macos.sh
 ```
@@ -54,7 +56,7 @@ After applying policies, restart your Chromium-based browser and verify at `chro
 
 ### 🗑️ Uninstallation
 
-Just run the same setup script again, then choose **Uninstall** when prompted.
+Just run the same setup script again, then choose **`Uninstall`** when prompted.
 
 ---
 
@@ -62,7 +64,7 @@ Just run the same setup script again, then choose **Uninstall** when prompted.
 
 Contributions are welcome at the discretion of the project maintainer.
 
-If you believe a relevant setting is missing or something is broken, please open an issue or submit a pull request.
+If you believe a relevant policy is missing or something is broken, please open an issue or submit a pull request.
 
 ---
 
