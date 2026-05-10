@@ -14,8 +14,6 @@
   </a>
 </p>
 
----
-
 `chromium-policies.json` is a policy file for Chromium-based browsers, built to maximise security and privacy, including stripping telemetry, and tightening the attack surface – with the goal of preserving usability wherever possible (though some breakage is expected).
 
 Unlike browser extensions or experimental flags, policies are enforced at the system level and apply to all profiles. This project takes that mechanism and employs it to the same problems that [arkenfox/user.js](https://github.com/arkenfox/user.js) solves for Firefox – but for Google's Chromium. It draws similar inspiration from [ungoogled-software/ungoogled-chromium](https://github.com/ungoogled-software/ungoogled-chromium), achieving comparable hardening through local policies rather than a custom build.
