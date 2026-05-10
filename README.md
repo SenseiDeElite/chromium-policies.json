@@ -1,6 +1,20 @@
-## 🌐 chromium-policies.json
+<p align="center">
+  <img src="Chromium_Logo.svg" alt="Chromium logo" width="120" />
+</p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/SenseiDeElite/chromium-policies.json/blob/main/LICENSE)
+<h1 align="center">chromium-policies.json</h1>
+
+<p align="center">
+  A <b>policy</b> file for configuration and hardening of <b>Chromium-based</b> browsers.
+</p>
+
+<p align="center">
+  <a href="https://github.com/SenseiDeElite/chromium-policies.json/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" />
+  </a>
+</p>
+
+---
 
 `chromium-policies.json` is a policy file for Chromium-based browsers, built to maximise security and privacy, including stripping telemetry, and tightening the attack surface – with the goal of preserving usability wherever possible (though some breakage is expected).
 
