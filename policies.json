@@ -77,7 +77,6 @@
   "PaymentMethodQueryEnabled": false,
   "PdfUseSkiaRendererEnabled": true,
   "PrintPreviewUseSystemDefaultPrinter": true,
-  "PrivacySandboxPromptEnabled": false,
   "PromotionsEnabled": false,
   "PromptForDownloadLocation": true,
   "QuicAllowed": true,
