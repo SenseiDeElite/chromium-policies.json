@@ -14,7 +14,6 @@
   "AutomatedPasswordChangeSettings": 2,
   "AutoplayAllowed": false,
   "BackgroundModeEnabled": false,
-  "BlockExternalExtensions": true,
   "BlockThirdPartyCookies": true,
   "BrowserGuestModeEnabled": false,
   "BrowserNetworkTimeQueriesEnabled": false,
