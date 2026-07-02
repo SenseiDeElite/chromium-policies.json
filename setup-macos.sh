@@ -209,12 +209,25 @@ plist_tmp  = plist_path.with_suffix(".tmp")
 with open(json_path) as f:
     raw = json.load(f)
 
+def is_plist_safe(value):
+    # plistlib can serialize bool/int/float/str and nested list/dict
+    # combinations of those, but chokes on JSON null (Python None).
+    if value is None:
+        return False
+    if isinstance(value, (bool, int, float, str)):
+        return True
+    if isinstance(value, list):
+        return all(is_plist_safe(v) for v in value)
+    if isinstance(value, dict):
+        return all(isinstance(k, str) and is_plist_safe(v) for k, v in value.items())
+    return False
+
 policies = {}
 skipped  = []
 
 for key, value in raw.items():
     # bool must be checked before int (bool is a subclass of int in Python)
-    if isinstance(value, (bool, int, str)):
+    if is_plist_safe(value):
         policies[key] = value
     else:
         skipped.append((key, type(value).__name__))
