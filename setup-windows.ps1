@@ -190,6 +190,7 @@ if ($action -eq "2") {
             $key   = $policy.Name
             $value = $policy.Value
             try {
+                $displayValue = $value
                 switch ($value.GetType().Name) {
                     "Boolean" {
                         $dword = if ($value) { 1 } else { 0 }
@@ -198,13 +199,23 @@ if ($action -eq "2") {
                     "Int64"  { Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type DWord }
                     "Int32"  { Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type DWord }
                     "String" { Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type String }
+                    { $_ -in @("PSCustomObject", "Object[]", "Hashtable") } {
+                        # Chromium's "dict"/"list" policies (e.g. ExtensionSettings) are read
+                        # from the registry as a single REG_SZ containing the JSON-encoded
+                        # value, exactly as it appears in policies.json.
+                        # -InputObject (not the pipeline) keeps single-element arrays from
+                        # being unrolled into a bare scalar by ConvertTo-Json.
+                        $json = ConvertTo-Json -InputObject $value -Depth 100 -Compress
+                        Set-ItemProperty -Path $RegPath -Name $key -Value $json -Type String
+                        $displayValue = $json
+                    }
                     default {
                         Write-Warning "Skipping $key – unsupported type"
                         $skipped++
                         continue
                     }
                 }
-                Write-Host " SET $key = $value"
+                Write-Host " SET $key = $displayValue"
                 $applied++
             } catch {
                 Write-Error "Failed to set ${key}: $_"
