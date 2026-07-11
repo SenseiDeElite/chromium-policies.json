@@ -30,7 +30,7 @@ The current template covers:
 - **UI & behaviour –** full URLs are always shown in the address bar; search suggestions, translation, spellcheck service, autoplay, network prediction, and background mode are disabled; download location prompt is always shown; external extensions are blocked;
 - **+** Relevant early & experimental features are also expected.
 
-> 🛡️ **Safe Browsing is disabled** in this configuration as it sends URLs to Google for evaluation, which is a privacy concern. To maintain protection against malicious sites, it is recommended to use [uBlock Origin Lite](https://github.com/uBlockOrigin/uBOL-home) and DNS-level content blocking with filter lists such as [uAssets badware filter](https://github.com/uBlockOrigin/uAssets/blob/master/filters/badware.txt) and [URLhaus malware filter](https://gitlab.com/malware-filter/urlhaus-filter).
+> 🛡️ **Safe Browsing is disabled** in this configuration as it sends URLs to Google for evaluation, which is a privacy concern. To maintain protection against malicious sites, it is recommended to use [uBlock Origin Lite](https://github.com/uBlockOrigin/uBOL-home) and DNS-level content blocking with filter lists such as [URLhaus malware filter](https://gitlab.com/malware-filter/urlhaus-filter).
 
 > 🫆 **Fingerprinting notice:** Using this configuration may make you stand out more easily to fingerprinting – unless there are enough users adopting it too.
 
