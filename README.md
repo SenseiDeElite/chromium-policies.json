@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/SenseiDeElite/chromium-policies.json/blob/main/LICENSE">
-    <img src="https://img.shields.io/badge/License-MIT-ffffff?style=for-the-badge&labelColor=333333&logo=opensourceinitiative&logoColor=white" alt="License: MIT" />
+    <img src="https://img.shields.io/badge/License-MIT-D9D9D9?style=for-the-badge&labelColor=1a1a1a&logo=opensourceinitiative&logoColor=white" alt="License: MIT" />
   </a>
 </p>
 
