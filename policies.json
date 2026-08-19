@@ -107,5 +107,19 @@
   "WebRtcEventLogCollectionAllowed": false,
   "WebRtcIPHandling": "default_public_interface_only",
   "WebRtcPostQuantumKeyAgreement": true,
-  "WebRtcTextLogCollectionAllowed": false
+  "WebRtcTextLogCollectionAllowed": false,
+  "SigninInterceptionEnabled": false,
+  "ThirdPartyAiChatSettings": 1,
+  "VoiceTypingSettings": 2,
+  "SmartTabSharingSettings": 1,
+  "GeminiSparkSettings": 1,
+  "DefaultIdleDetectionSetting": 2,
+  "RemoteAccessHostAllowFileTransfer": false,
+  "RemoteAccessHostAllowUrlForwarding": false,
+  "RemoteAccessHostAllowRemoteSupportConnections": false,
+  "RemoteAccessHostAllowRelayedConnection": false,
+  "RemoteAccessHostRequireCurtain": true,
+  "RemoteAccessHostMatchUsername": true,
+  "RemoteAccessHostAllowPinAuthentication": false,
+  "RemoteAccessHostAllowClientPairing": false
 }
