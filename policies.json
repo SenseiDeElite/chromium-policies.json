@@ -23,7 +23,6 @@
   "CAPlatformIntegrationEnabled": true,
   "ChromeForTestingAllowed": false,
   "ChromeVariations": 1,
-  "ClickToCallEnabled": false,
   "CommandLineFlagSecurityWarningsEnabled": true,
   "ComponentUpdatesEnabled": false,
   "CompressionDictionaryTransportEnabled": true,
