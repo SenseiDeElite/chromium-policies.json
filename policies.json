@@ -31,6 +31,7 @@
   "DefaultFileSystemReadGuardSetting": 2,
   "DefaultFileSystemWriteGuardSetting": 2,
   "DefaultGeolocationSetting": 2,
+  "DefaultIdleDetectionSetting": 2,
   "DefaultInsecureContentSetting": 2,
   "DefaultJavaScriptOptimizerSetting": 2,
   "DefaultLocalFontsSetting": 2,
