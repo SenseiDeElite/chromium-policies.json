@@ -25,32 +25,39 @@ $Targets = @{
     "Brave"    = "HKLM:\SOFTWARE\Policies\BraveSoftware\Brave"
 }
 
+# Prints one or more lines to stderr and exits
+function Fail {
+    param([string[]]$Lines)
+    foreach ($line in $Lines) { [Console]::Error.WriteLine($line) }
+    exit 1
+}
+
 # --- Parse selection input into browser names ---
 # Accepts: single (1), comma-separated (1,2), ranges (1-3), or mixed (1,2-5)
 function Parse-Selection {
-    param([string]$Input, [int]$Max)
+    param([string]$Selection, [int]$Max)
 
     $indices = [System.Collections.Generic.List[int]]::new()
 
-    foreach ($token in ($Input -split ',')) {
+    foreach ($token in ($Selection -split ',')) {
         $token = $token.Trim()
         if ($token -match '^(\d+)-(\d+)$') {
             $start = [int]$Matches[1]
             $end   = [int]$Matches[2]
             if ($start -lt 1 -or $end -gt $Max -or $start -gt $end) {
-                Write-Error "Invalid range: $token"
+                Write-Warning "Invalid range: $token"
                 return $null
             }
             $start..$end | ForEach-Object { $indices.Add($_) }
         } elseif ($token -match '^\d+$') {
             $n = [int]$token
             if ($n -lt 1 -or $n -gt $Max) {
-                Write-Error "Invalid option: $token"
+                Write-Warning "Invalid option: $token"
                 return $null
             }
             $indices.Add($n)
         } else {
-            Write-Error "Invalid input: $token"
+            Write-Warning "Invalid input: $token"
             return $null
         }
     }
@@ -70,9 +77,7 @@ function Parse-Selection {
 # --- Resolve policies.json ---
 if (-not (Test-Path $JsonPath)) {
     if ($Skip) {
-        Write-Error "policies.json not found at: $JsonPath"
-        Write-Error "Remove -Skip to allow remote fetch."
-        exit 1
+        Fail "Error: policies.json not found at: $JsonPath", "       Remove -Skip to allow remote fetch."
     }
 
     # curl.exe ships in System32 on Windows 10 1803+ and Windows Server 2019+.
@@ -84,32 +89,26 @@ if (-not (Test-Path $JsonPath)) {
     }
 
     if (-not $CurlBin) {
-        Write-Error "curl.exe is not available on this system."
-        Write-Error "Download policies.json manually from: $RemoteUrl"
-        exit 1
+        Fail "Error: curl.exe is not available on this system.", "       Download policies.json manually from: $RemoteUrl"
     }
 
     Write-Host "No policies.json found in the script directory."
     Write-Host "Remote: $RemoteUrl"
     $confirm = Read-Host "Fetch policies.json from remote? [y/N]"
     if ($confirm -notmatch "^[Yy]$") {
-        Write-Error "Aborted."
-        exit 1
+        Fail "Aborted."
     }
-    try {
-        & $CurlBin -sS -o $JsonPath $RemoteUrl
-        if (-not (Test-Path $JsonPath)) { throw "File not created after fetch." }
-    } catch {
-        Write-Error "Failed to fetch policies.json from remote: $_"
-        exit 1
+    & $CurlBin -fsS -o $JsonPath $RemoteUrl
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $JsonPath)) {
+        if (Test-Path $JsonPath) { Remove-Item $JsonPath -Force }
+        Fail "Error: Failed to fetch policies.json from remote."
     }
     Write-Host "Fetched successfully."
 }
 
 # --- Verify policies.json is still present before proceeding ---
 if (-not (Test-Path $JsonPath)) {
-    Write-Error "policies.json not found at: $JsonPath"
-    exit 1
+    Fail "Error: policies.json not found at: $JsonPath"
 }
 
 # --- Browser selection ---
@@ -124,7 +123,7 @@ Write-Host "  [5] Brave"
 Write-Host ""
 $browserInput = Read-Host "Target browser(s)"
 
-$selected = Parse-Selection -Input $browserInput -Max $BrowserNames.Count
+$selected = Parse-Selection -Selection $browserInput -Max $BrowserNames.Count
 if (-not $selected -or $selected.Count -eq 0) {
     Write-Host "No valid selection. Aborting."
     exit 1
@@ -163,7 +162,7 @@ if ($action -eq "2") {
     }
 } else {
     # --- Install ---
-    $policies = Get-Content $JsonPath -Raw | ConvertFrom-Json
+    $policies = Get-Content $JsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
 
     foreach ($name in $selected) {
         $RegPath = $Targets[$name]
@@ -191,34 +190,29 @@ if ($action -eq "2") {
             $value = $policy.Value
             try {
                 $displayValue = $value
-                switch ($value.GetType().Name) {
-                    "Boolean" {
-                        $dword = if ($value) { 1 } else { 0 }
-                        Set-ItemProperty -Path $RegPath -Name $key -Value $dword -Type DWord
-                    }
-                    "Int64"  { Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type DWord }
-                    "Int32"  { Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type DWord }
-                    "String" { Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type String }
-                    { $_ -in @("PSCustomObject", "Object[]", "Hashtable") } {
-                        # Chromium's "dict"/"list" policies (e.g. ExtensionSettings) are read
-                        # from the registry as a single REG_SZ containing the JSON-encoded
-                        # value, exactly as it appears in policies.json.
-                        # -InputObject (not the pipeline) keeps single-element arrays from
-                        # being unrolled into a bare scalar by ConvertTo-Json.
-                        $json = ConvertTo-Json -InputObject $value -Depth 100 -Compress
-                        Set-ItemProperty -Path $RegPath -Name $key -Value $json -Type String
-                        $displayValue = $json
-                    }
-                    default {
-                        Write-Warning "Skipping $key – unsupported type"
-                        $skipped++
-                        continue
-                    }
+                if ($value -is [bool]) {
+                    $dword = if ($value) { 1 } else { 0 }
+                    Set-ItemProperty -Path $RegPath -Name $key -Value $dword -Type DWord
+                } elseif ($value -is [int] -or $value -is [long]) {
+                    Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type DWord
+                } elseif ($value -is [string]) {
+                    Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type String
+                } elseif ($value -is [array] -or $value -is [pscustomobject] -or $value -is [hashtable]) {
+                    # Chromium dict/list policies are stored as JSON in a single REG_SZ.
+                    # -InputObject prevents single-element arrays from being unrolled.
+                    $json = ConvertTo-Json -InputObject $value -Depth 100 -Compress
+                    Set-ItemProperty -Path $RegPath -Name $key -Value $json -Type String
+                    $displayValue = $json
+                } else {
+                    # null, floats are not valid top-level policy values.
+                    Write-Warning "Skipping $key - unsupported type"
+                    $skipped++
+                    continue
                 }
                 Write-Host " SET $key = $displayValue"
                 $applied++
             } catch {
-                Write-Error "Failed to set ${key}: $_"
+                Write-Warning "Failed to set ${key}: $_"
                 $skipped++
             }
         }
