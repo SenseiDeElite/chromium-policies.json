@@ -66,7 +66,9 @@ if [[ ! -f "$JSON_PATH" ]]; then
         echo "Aborted." >&2
         exit 1
     fi
-    if ! /usr/bin/curl -sS -o "$JSON_PATH" "$REMOTE_URL"; then
+    # treat HTTP errors as failures instead of saving the error page
+    if ! /usr/bin/curl -fsS -o "$JSON_PATH" "$REMOTE_URL"; then
+        rm -f "$JSON_PATH"
         echo "Error: Failed to fetch policies.json from remote." >&2
         exit 1
     fi
