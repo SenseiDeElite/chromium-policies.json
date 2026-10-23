@@ -9,6 +9,12 @@
   "AudioSandboxEnabled": true,
   "AuthSchemes": "negotiate",
   "AutofillPredictionSettings": 2,
+  "AutofillSettings": [
+    {
+      "url_pattern": "*",
+      "blocked_types": ["all"]
+    }
+  ],
   "AutomatedPasswordChangeSettings": 2,
   "AutoplayAllowed": false,
   "BackgroundModeEnabled": false,
