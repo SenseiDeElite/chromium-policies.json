@@ -12,15 +12,33 @@ JSON_PATH="$SCRIPT_DIR/policies.json"
 SKIP=false
 
 # Browser display order (used for menu and range parsing)
-BROWSER_NAMES=("Chromium/Vivaldi" "Chrome" "Edge" "Brave")
+BROWSER_NAMES=(
+    "Google Chrome"
+    "Chromium"
+    "Ungoogled Chromium"
+    "Microsoft Edge"
+    "Vivaldi"
+    "Brave"
+    "Yandex Browser"
+    "Cromite"
+    "Helium"
+    "Thorium"
+)
 
-# Browser name maps to the policy directory
-# Both Chromium and Vivaldi read from /etc/chromium/policies/managed/ on Linux
+# Browser name maps to the policy directory.
+# Several browsers read the stock Chromium directory. 
+# They are listed separately so the menu is unambiguous, but they share one policy file.
 declare -A POLICY_DIRS
-POLICY_DIRS["Chromium/Vivaldi"]="/etc/chromium/policies/managed"
-POLICY_DIRS["Chrome"]="/etc/opt/chrome/policies/managed"
-POLICY_DIRS["Edge"]="/etc/opt/microsoft/msedge/policies/managed"
+POLICY_DIRS["Google Chrome"]="/etc/opt/chrome/policies/managed"
+POLICY_DIRS["Chromium"]="/etc/chromium/policies/managed"
+POLICY_DIRS["Ungoogled Chromium"]="/etc/chromium/policies/managed"
+POLICY_DIRS["Microsoft Edge"]="/etc/opt/microsoft/msedge/policies/managed"
+POLICY_DIRS["Vivaldi"]="/etc/chromium/policies/managed"
 POLICY_DIRS["Brave"]="/etc/brave/policies/managed"
+POLICY_DIRS["Yandex Browser"]="/etc/opt/yandex/browser/policies/managed"
+POLICY_DIRS["Cromite"]="/etc/cromite/policies/managed"
+POLICY_DIRS["Helium"]="/etc/chromium/policies/managed"
+POLICY_DIRS["Thorium"]="/etc/chromium/policies/managed"
 
 # --- Usage ---
 usage() {
@@ -134,10 +152,12 @@ parse_selection() {
 echo ""
 echo "chromium-policies.json setup"
 echo "----------------------------"
-echo " [1] Chromium/Vivaldi"
-echo " [2] Google Chrome"
-echo " [3] Microsoft Edge"
-echo " [4] Brave"
+for i in "${!BROWSER_NAMES[@]}"; do
+    echo " [$((i+1))] ${BROWSER_NAMES[$i]}"
+done
+echo ""
+echo "Note: Chromium, Ungoogled Chromium, Vivaldi, Helium and Thorium share"
+echo "      /etc/chromium/policies/managed, so changes apply to all of them."
 echo ""
 read -r -p "Target browser(s): " browser_input </dev/tty
 
@@ -165,12 +185,20 @@ esac
 
 # --- Process each selected browser ---
 changed=false
+declare -A processed=()
 for name in "${selected[@]}"; do
     policy_dir="${POLICY_DIRS[$name]}"
     policy_dest="$policy_dir/policies.json"
 
     echo ""
     echo "Processing $name..."
+
+    # Several browsers share one policy file; only handle each file once per run
+    if [[ -n "${processed[$policy_dest]+x}" ]]; then
+        echo "[$name] Shares $policy_dest with ${processed[$policy_dest]} - already handled."
+        continue
+    fi
+    processed["$policy_dest"]="$name"
 
     # Uninstall
     if [[ "$do_install" == false ]]; then
