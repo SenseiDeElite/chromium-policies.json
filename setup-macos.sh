@@ -1,6 +1,7 @@
 #!/usr/bin/env zsh
 # setup-macos.sh – Apply or remove chromium-policies.json on macOS.
 # Must be run with elevated privileges: sudo ./setup-macos.sh
+# Note: Cromite has no macOS build, so it is intentionally not listed.
 
 set -eu
 
@@ -12,14 +13,31 @@ PLIST_DIR="/Library/Managed Preferences"
 SKIP=false
 
 # Browser display order (used for menu and range parsing)
-BROWSER_NAMES=(Chrome Chromium Edge Vivaldi Brave)
+BROWSER_NAMES=(
+    "Google Chrome"
+    "Chromium"
+    "Ungoogled Chromium"
+    "Microsoft Edge"
+    "Vivaldi"
+    "Brave"
+    "Yandex Browser"
+    "Helium"
+    "Thorium"
+)
 
-declare -A BROWSERS
-BROWSERS[Chrome]="com.google.Chrome"
-BROWSERS[Chromium]="org.chromium.Chromium"
-BROWSERS[Edge]="com.microsoft.Edge"
-BROWSERS[Vivaldi]="com.vivaldi.Vivaldi"
-BROWSERS[Brave]="com.brave.Browser"
+# Chromium and Ungoogled Chromium share the same bundle ID (and therefore the same plist).
+# Compound assignment is required: BROWSERS["Name With Space"]=... would store the quotes in the key in zsh.
+typeset -A BROWSERS=(
+    "Google Chrome"      "com.google.Chrome"
+    "Chromium"           "org.chromium.Chromium"
+    "Ungoogled Chromium" "org.chromium.Chromium"
+    "Microsoft Edge"     "com.microsoft.Edge"
+    "Vivaldi"            "com.vivaldi.Vivaldi"
+    "Brave"              "com.brave.Browser"
+    "Yandex Browser"     "ru.yandex.desktop.yandex-browser"
+    "Helium"             "net.imput.helium"
+    "Thorium"            "org.chromium.Thorium"
+)
 
 # --- Usage ---
 usage() {
@@ -119,7 +137,7 @@ parse_selection() {
     for idx in "${indices[@]}"; do
         if [[ -z "${seen[$idx]+x}" ]]; then
             seen[$idx]=1
-            echo "${BROWSER_NAMES[$((idx-1))]}"
+            echo "${BROWSER_NAMES[$idx]}"
         fi
     done
 }
@@ -128,16 +146,16 @@ parse_selection() {
 echo ""
 echo "chromium-policies.json setup"
 echo "----------------------------"
-echo " [1] Google Chrome"
-echo " [2] Chromium"
-echo " [3] Microsoft Edge"
-echo " [4] Vivaldi"
-echo " [5] Brave"
+for (( i=1; i<=${#BROWSER_NAMES[@]}; i++ )); do
+    echo " [$i] ${BROWSER_NAMES[$i]}"
+done
+echo ""
+echo "Note: Chromium and Ungoogled Chromium share one plist, so changes apply to both."
 echo ""
 printf "Target browser(s): "
 read -r browser_input </dev/tty
 
-selected=("${(@f)$(parse_selection "$browser_input" "${#BROWSER_NAMES[@]}")}")
+selected=(${(@f)"$(parse_selection "$browser_input" "${#BROWSER_NAMES[@]}")"})
 if [[ ${#selected[@]} -eq 0 ]]; then
     echo "No valid selection. Aborting." >&2
     exit 1
@@ -162,12 +180,20 @@ esac
 
 # --- Process each selected browser ---
 changed=false
+typeset -A processed
 for name in "${selected[@]}"; do
     bundle_id="${BROWSERS[$name]}"
     plist_path="$PLIST_DIR/$bundle_id.plist"
 
     echo ""
     echo "Processing $name ($bundle_id)..."
+
+    # Browsers sharing a bundle ID share one plist; only handle each once per run
+    if [[ -n "${processed[$bundle_id]-}" ]]; then
+        echo "[$name] Shares $bundle_id.plist with ${processed[$bundle_id]} - already handled."
+        continue
+    fi
+    processed[$bundle_id]="$name"
 
     # Uninstall
     if [[ "$do_install" == false ]]; then
