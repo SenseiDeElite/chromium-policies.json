@@ -25,8 +25,7 @@ BROWSER_NAMES=(
     "Thorium"
 )
 
-# Browser name maps to the policy directory.
-# Several browsers read the stock Chromium directory. 
+# Chromium, Ungoogled Chromium, Vivaldi, Helium and Thorium read the stock Chromium directory.
 # They are listed separately so the menu is unambiguous, but they share one policy file.
 declare -A POLICY_DIRS
 POLICY_DIRS["Google Chrome"]="/etc/opt/chrome/policies/managed"
