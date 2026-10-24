@@ -15,14 +15,32 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $JsonPath  = Join-Path $ScriptDir "policies.json"
 
 # Browser display order (used for menu and range parsing)
-$BrowserNames = @("Chrome", "Chromium", "Edge", "Vivaldi", "Brave")
+$BrowserNames = @(
+    "Google Chrome",
+    "Chromium",
+    "Ungoogled Chromium",
+    "Microsoft Edge",
+    "Vivaldi",
+    "Brave",
+    "Yandex Browser",
+    "Cromite",
+    "Helium",
+    "Thorium"
+)
 
+# Chromium, Ungoogled Chromium, Helium and Thorium all read the stock Chromium key.
+# They are listed separately so the menu is unambiguous, but they share one key.
 $Targets = @{
-    "Chrome"   = "HKLM:\SOFTWARE\Policies\Google\Chrome"
-    "Chromium" = "HKLM:\SOFTWARE\Policies\Chromium"
-    "Edge"     = "HKLM:\SOFTWARE\Policies\Microsoft\Edge"
-    "Vivaldi"  = "HKLM:\SOFTWARE\Policies\Vivaldi"
-    "Brave"    = "HKLM:\SOFTWARE\Policies\BraveSoftware\Brave"
+    "Google Chrome"      = "HKLM:\SOFTWARE\Policies\Google\Chrome"
+    "Chromium"           = "HKLM:\SOFTWARE\Policies\Chromium"
+    "Ungoogled Chromium" = "HKLM:\SOFTWARE\Policies\Chromium"
+    "Microsoft Edge"     = "HKLM:\SOFTWARE\Policies\Microsoft\Edge"
+    "Vivaldi"            = "HKLM:\SOFTWARE\Policies\Vivaldi"
+    "Brave"              = "HKLM:\SOFTWARE\Policies\BraveSoftware\Brave"
+    "Yandex Browser"     = "HKLM:\SOFTWARE\Policies\YandexBrowser"
+    "Cromite"            = "HKLM:\SOFTWARE\Policies\Cromite"
+    "Helium"             = "HKLM:\SOFTWARE\Policies\Chromium"
+    "Thorium"            = "HKLM:\SOFTWARE\Policies\Chromium"
 }
 
 # Prints one or more lines to stderr and exits
@@ -115,11 +133,11 @@ if (-not (Test-Path $JsonPath)) {
 Write-Host ""
 Write-Host "chromium-policies.json setup"
 Write-Host "----------------------------"
-Write-Host "  [1] Google Chrome"
-Write-Host "  [2] Chromium"
-Write-Host "  [3] Microsoft Edge"
-Write-Host "  [4] Vivaldi"
-Write-Host "  [5] Brave"
+for ($i = 0; $i -lt $BrowserNames.Count; $i++) {
+    Write-Host "  [$($i + 1)] $($BrowserNames[$i])"
+}
+Write-Host ""
+Write-Host "Note: Chromium, Ungoogled Chromium, Helium and Thorium share one registry key, so changes apply to all of them."
 Write-Host ""
 $browserInput = Read-Host "Target browser(s)"
 
@@ -142,11 +160,17 @@ if ($action -notin @("1", "2")) {
 }
 
 $changed = $false
+$processed = @{}
 
 # --- Uninstall ---
 if ($action -eq "2") {
     foreach ($name in $selected) {
         $RegPath = $Targets[$name]
+        if ($processed.ContainsKey($RegPath)) {
+            Write-Host "[$name] Shares $RegPath with $($processed[$RegPath]) - already handled."
+            continue
+        }
+        $processed[$RegPath] = $name
         if (-not (Test-Path $RegPath)) {
             Write-Host "[$name] Nothing to remove – registry key does not exist."
             continue
@@ -168,6 +192,13 @@ if ($action -eq "2") {
         $RegPath = $Targets[$name]
         Write-Host ""
         Write-Host "Processing $name..."
+
+        # Browsers sharing a registry key are only handled once per run
+        if ($processed.ContainsKey($RegPath)) {
+            Write-Host "[$name] Shares $RegPath with $($processed[$RegPath]) - already handled."
+            continue
+        }
+        $processed[$RegPath] = $name
 
         # Confirm overwrite if registry key already exists
         if (Test-Path $RegPath) {
