@@ -214,13 +214,23 @@ case "$action" in
         ;;
 esac
 
-# --- Validate policies.json before anything is modified (install only) ---
-if [[ "$do_install" == true ]]; then
-    if ! err="$(validate_policies_json "$JSON_PATH" 2>&1)"; then
-        echo "Error: $JSON_PATH is not usable: $err" >&2
+# Private, root-owned snapshot of policies.json
+snap_dir=""
+snap=""
+cleanup() { [[ -n "$snap_dir" ]] && rm -rf -- "$snap_dir"; return 0; }
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+take_snapshot() {
+    [[ -n "$snap" ]] && return 0
+    snap_dir="$(/usr/bin/mktemp -d)" || exit 1
+    snap="$snap_dir/policies.json"
+    if ! /bin/cp -- "$JSON_PATH" "$snap"; then
+        echo "Error: could not read $JSON_PATH. Nothing was installed." >&2
         exit 1
     fi
-fi
+}
 
 # --- Process each selected browser ---
 changed=false
@@ -267,14 +277,16 @@ for name in "${selected[@]}"; do
         fi
     fi
 
-    # Install
+    # Install: snapshot once
+    take_snapshot
     mkdir -p "$PLIST_DIR"
 
-    python3 - "$JSON_PATH" "$plist_path" <<'PYEOF'
+    python3 - "$snap" "$plist_path" "$JSON_PATH" <<'PYEOF'
 import sys, json, plistlib, os, grp, subprocess
 from pathlib import Path
 
-json_path  = Path(sys.argv[1])
+json_path  = Path(sys.argv[1])   # snapshot that is actually read (and checked) here
+shown_path = sys.argv[3]         # original location, used in messages
 plist_path = Path(sys.argv[2])
 plist_tmp  = plist_path.with_suffix(".tmp")
 
@@ -289,9 +301,9 @@ try:
     with open(json_path, encoding="utf-8-sig") as f:
         raw = json.load(f, parse_constant=reject_constant)
 except (OSError, UnicodeDecodeError) as e:
-    die(f"cannot read {json_path} as UTF-8: {e}")
+    die(f"cannot read {shown_path} as UTF-8: {e}")
 except ValueError as e:
-    die(f"{json_path} is not valid JSON: {e}")
+    die(f"{shown_path} is not valid JSON: {e}")
 if not isinstance(raw, dict):
     die("policies.json must contain a JSON object at the top level")
 
