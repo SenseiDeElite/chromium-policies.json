@@ -5,7 +5,11 @@
 
 set -eu
 
+# Force UTF-8 for Python regardless of the caller's locale (sudo may reset it).
+export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
+
 REMOTE_URL="https://raw.githubusercontent.com/SenseiDeElite/chromium-policies.json/refs/heads/main/policies.json"
+SCRIPT_NAME="${0:t}"   # $0 inside a function is the function name in zsh
 SCRIPT_DIR="${0:A:h}"
 JSON_PATH="$SCRIPT_DIR/policies.json"
 PLIST_DIR="/Library/Managed Preferences"
@@ -39,21 +43,44 @@ typeset -A BROWSERS=(
     "Thorium"            "org.chromium.Thorium"
 )
 
+# --- Validate a policies.json file: well-formed JSON, top-level object, not empty ---
+# Prints a clean message and returns 1 instead of a Python traceback.
+validate_policies_json() {
+    python3 - "$1" <<'PYEOF'
+import sys, json
+
+def reject_constant(name):
+    raise ValueError(f"{name} is not valid JSON")
+
+try:
+    with open(sys.argv[1], encoding="utf-8-sig") as f:   # utf-8-sig tolerates a BOM
+        raw = json.load(f, parse_constant=reject_constant)
+except (OSError, UnicodeDecodeError) as e:
+    sys.exit(f"cannot read file as UTF-8: {e}")
+except ValueError as e:
+    sys.exit(f"not valid JSON: {e}")
+if not isinstance(raw, dict):
+    sys.exit("top level must be a JSON object")
+if not raw:
+    sys.exit("the JSON object contains no policies")
+PYEOF
+}
+
 # --- Usage ---
 usage() {
-    echo "Usage: $0 [options...]"
+    echo "Usage: $SCRIPT_NAME [options...]"
     echo ""
     echo "Options:"
     echo " -s, --skip Skip remote policies.json fetch"
     echo " -h, --help Displays this help message"
-    exit 1
+    exit "${1:-1}"
 }
 
 # --- Argument parsing ---
 for arg in "$@"; do
     case "$arg" in
         -s|--skip) SKIP=true ;;
-        -h|--help) usage ;;
+        -h|--help) usage 0 ;;
         *)
             echo "Error: Unknown option: $arg" >&2
             usage
@@ -84,12 +111,21 @@ if [[ ! -f "$JSON_PATH" ]]; then
         echo "Aborted." >&2
         exit 1
     fi
-    # treat HTTP errors as failures instead of saving the error page
-    if ! /usr/bin/curl -fsS -o "$JSON_PATH" "$REMOTE_URL"; then
-        rm -f "$JSON_PATH"
+    # Download to a temp file and validate it first, so an HTTP error page, a captive-portal
+    # page or a truncated download never ends up as policies.json.
+    dl_tmp="$(/usr/bin/mktemp "$SCRIPT_DIR/.policies.json.XXXXXX")" || exit 1
+    if ! /usr/bin/curl -fsS -o "$dl_tmp" "$REMOTE_URL"; then
+        rm -f "$dl_tmp"
         echo "Error: Failed to fetch policies.json from remote." >&2
         exit 1
     fi
+    if ! err="$(validate_policies_json "$dl_tmp" 2>&1)"; then
+        rm -f "$dl_tmp"
+        echo "Error: Downloaded file is not a usable policies.json: $err" >&2
+        exit 1
+    fi
+    chmod 644 "$dl_tmp"
+    mv -f "$dl_tmp" "$JSON_PATH"
     echo "Fetched successfully."
 fi
 
@@ -107,7 +143,7 @@ parse_selection() {
     local -a indices=()
 
     local IFS=','
-    local -a tokens=("${(s:,:)input}")
+    local -a tokens=("${(@s:,:)input}")
     for token in "${tokens[@]}"; do
         token="${token// /}"
         if [[ "$token" =~ ^([0-9]+)-([0-9]+)$ ]]; then
@@ -178,6 +214,14 @@ case "$action" in
         ;;
 esac
 
+# --- Validate policies.json before anything is modified (install only) ---
+if [[ "$do_install" == true ]]; then
+    if ! err="$(validate_policies_json "$JSON_PATH" 2>&1)"; then
+        echo "Error: $JSON_PATH is not usable: $err" >&2
+        exit 1
+    fi
+fi
+
 # --- Process each selected browser ---
 changed=false
 typeset -A processed
@@ -227,22 +271,45 @@ for name in "${selected[@]}"; do
     mkdir -p "$PLIST_DIR"
 
     python3 - "$JSON_PATH" "$plist_path" <<'PYEOF'
-import sys, json, plistlib, os
+import sys, json, plistlib, os, grp, subprocess
 from pathlib import Path
 
 json_path  = Path(sys.argv[1])
 plist_path = Path(sys.argv[2])
 plist_tmp  = plist_path.with_suffix(".tmp")
 
-with open(json_path) as f:
-    raw = json.load(f)
+def die(msg):
+    print(f"Error: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+def reject_constant(name):
+    raise ValueError(f"{name} is not valid JSON")
+
+try:
+    with open(json_path, encoding="utf-8-sig") as f:
+        raw = json.load(f, parse_constant=reject_constant)
+except (OSError, UnicodeDecodeError) as e:
+    die(f"cannot read {json_path} as UTF-8: {e}")
+except ValueError as e:
+    die(f"{json_path} is not valid JSON: {e}")
+if not isinstance(raw, dict):
+    die("policies.json must contain a JSON object at the top level")
+
+# plistlib stores ints as signed 64-bit (or unsigned up to 2**64-1)
+INT_MIN, INT_MAX = -(2**63), 2**64 - 1
 
 def is_plist_safe(value):
     # plistlib can serialize bool/int/float/str and nested list/dict
     # combinations of those, but chokes on JSON null (Python None).
     if value is None:
         return False
-    if isinstance(value, (bool, int, float, str)):
+    if isinstance(value, bool):
+        return True
+    if isinstance(value, int):
+        return INT_MIN <= value <= INT_MAX
+    if isinstance(value, float):
+        return value == value and value not in (float("inf"), float("-inf"))
+    if isinstance(value, str):
         return True
     if isinstance(value, list):
         return all(is_plist_safe(v) for v in value)
@@ -254,37 +321,41 @@ policies = {}
 skipped  = []
 
 for key, value in raw.items():
-    # bool must be checked before int (bool is a subclass of int in Python)
     if is_plist_safe(value):
         policies[key] = value
     else:
         skipped.append((key, type(value).__name__))
-        continue
-    print(f" SET {key} = {value}")
+
+# Never replace a working plist with an empty one.
+if not policies:
+    die("no usable policies were found in policies.json; existing plist left untouched")
+
+def lint(path):
+    return subprocess.run(["/usr/bin/plutil", "-lint", str(path)],
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
 
 try:
     with open(plist_tmp, "wb") as f:
         plistlib.dump(policies, f, fmt=plistlib.FMT_XML, sort_keys=True)
+        f.flush()
+        os.fsync(f.fileno())
+    # Fix mode/ownership and validate the temp file BEFORE it replaces the live plist,
+    # so a failure here can never leave the browser without its previous policies.
+    os.chmod(plist_tmp, 0o644)
+    os.chown(plist_tmp, 0, grp.getgrnam("wheel").gr_gid)
+    if not lint(plist_tmp):
+        die("plist validation failed; existing plist left untouched")
     os.replace(plist_tmp, plist_path)
 finally:
     if plist_tmp.exists():
         plist_tmp.unlink(missing_ok=True)
 
+for key in sorted(policies):
+    print(f" SET {key} = {policies[key]}")
 print(f"Written {len(policies)} policies to {plist_path}")
-if skipped:
-    for k, t in skipped:
-        print(f" SKIPPED {k} ({t}) – unsupported type", file=sys.stderr)
+for k, t in skipped:
+    print(f" SKIPPED {k} ({t}) – unsupported value", file=sys.stderr)
 PYEOF
-
-    chown root:wheel "$plist_path"
-    chmod 644 "$plist_path"
-
-    # Validate the plist is well-formed
-    if ! plutil -lint "$plist_path" &>/dev/null; then
-        echo "[$name] Error: plist validation failed. Removing corrupt file." >&2
-        rm -f "$plist_path"
-        exit 1
-    fi
 
     echo "[$name] Done."
     changed=true
