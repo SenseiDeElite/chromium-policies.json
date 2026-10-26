@@ -11,6 +11,39 @@ JSON_PATH="$SCRIPT_DIR/policies.json"
 
 SKIP=false
 
+# --- Optional JSON integrity check ---
+PYTHON_BIN=""
+for _py in python3 python; do
+    if command -v "$_py" &>/dev/null && "$_py" -c 'import sys; sys.exit(sys.version_info[0] < 3)' &>/dev/null; then
+        PYTHON_BIN="$_py"
+        break
+    fi
+done
+unset _py
+
+# check_json FILE -> 0 = well-formed, 1 = problem (reason on stdout). Requires PYTHON_BIN.
+# UTF-8 is forced, so the result does not depend on the caller's locale.
+check_json() {
+    PYTHONUTF8=1 PYTHONIOENCODING=utf-8 "$PYTHON_BIN" - "$1" <<'PYEOF'
+import sys, json
+
+def reject_constant(name):
+    raise ValueError(f"{name} is not valid JSON")
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as f:
+        data = json.load(f, parse_constant=reject_constant)
+except (OSError, UnicodeDecodeError) as e:
+    sys.exit(f"cannot read file as UTF-8: {e}")
+except ValueError as e:
+    sys.exit(f"not valid JSON: {e}")
+if not isinstance(data, dict):
+    sys.exit("top level must be a JSON object")
+if not data:
+    sys.exit("the JSON object contains no policies")
+PYEOF
+}
+
 # Browser display order (used for menu and range parsing)
 BROWSER_NAMES=(
     "Google Chrome"
@@ -46,14 +79,14 @@ usage() {
     echo "Options:"
     echo " -s, --skip Skip remote policies.json fetch"
     echo " -h, --help Displays this help message"
-    exit 1
+    exit "${1:-1}"
 }
 
 # --- Argument parsing ---
 for arg in "$@"; do
     case "$arg" in
         -s|--skip) SKIP=true ;;
-        -h|--help) usage ;;
+        -h|--help) usage 0 ;;
         *)
             echo "Error: Unknown option: $arg" >&2
             usage
@@ -90,12 +123,21 @@ if [[ ! -f "$JSON_PATH" ]]; then
         echo "Aborted." >&2
         exit 1
     fi
-    # treat HTTP errors as failures instead of saving the error page
-    if ! curl -fsS -o "$JSON_PATH" "$REMOTE_URL"; then
-        rm -f "$JSON_PATH"
+    # Download to a temp file first (and validate it when Python is available), so an HTTP
+    # error page, a captive-portal page or a truncated download never becomes the final file.
+    dl_tmp="$(mktemp "$SCRIPT_DIR/.policies.json.XXXXXX")" || exit 1
+    if ! curl -fsS -o "$dl_tmp" "$REMOTE_URL"; then
+        rm -f "$dl_tmp"
         echo "Error: Failed to fetch policies.json from remote." >&2
         exit 1
     fi
+    if [[ -n "$PYTHON_BIN" ]] && ! err="$(check_json "$dl_tmp" 2>&1)"; then
+        rm -f "$dl_tmp"
+        echo "Error: Downloaded file is not a usable policies.json: $err" >&2
+        exit 1
+    fi
+    chmod 644 "$dl_tmp"
+    mv -f "$dl_tmp" "$JSON_PATH"
     echo "Fetched successfully."
 fi
 
@@ -181,6 +223,23 @@ case "$action" in
         exit 1
         ;;
 esac
+
+# --- JSON integrity check ---
+if [[ "$do_install" == true ]]; then
+    if [[ -n "$PYTHON_BIN" ]]; then
+        if ! err="$(check_json "$JSON_PATH" 2>&1)"; then
+            echo "Error: JSON integrity check failed for $JSON_PATH: $err" >&2
+            echo "       Nothing was installed." >&2
+            exit 1
+        fi
+        echo ""
+        echo "JSON integrity check passed: policies.json is well-formed."
+    else
+        echo ""
+        echo "Warning: Python 3 was not found, so NO JSON integrity check was performed." >&2
+        echo "         Installing anyway. Install Python 3 first if you want policies.json verified." >&2
+    fi
+fi
 
 # --- Process each selected browser ---
 changed=false
