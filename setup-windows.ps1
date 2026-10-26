@@ -10,6 +10,13 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Force UTF-8 for console I/O.
+try {
+    $Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    [Console]::OutputEncoding = $Utf8NoBom
+    $OutputEncoding = $Utf8NoBom
+} catch { }
+
 $RemoteUrl = "https://raw.githubusercontent.com/SenseiDeElite/chromium-policies.json/refs/heads/main/policies.json"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $JsonPath  = Join-Path $ScriptDir "policies.json"
@@ -48,6 +55,130 @@ function Fail {
     param([string[]]$Lines)
     foreach ($line in $Lines) { [Console]::Error.WriteLine($line) }
     exit 1
+}
+
+# Reads policies.json as strict UTF-8 and returns the parsed object.
+# Throws a clean message if the file is not well-formed JSON or not a non-empty object.
+function Read-PolicyFile {
+    param([Parameter(Mandatory)][string]$Path)
+
+    try {
+        $text = [System.IO.File]::ReadAllText($Path, [System.Text.UTF8Encoding]::new($false, $true))
+    } catch {
+        throw "cannot read $Path as UTF-8: $($_.Exception.Message)"
+    }
+    if ([string]::IsNullOrWhiteSpace($text)) { throw "$Path is empty." }
+
+    # Test-Json (PowerShell 7+) is strict. Windows PowerShell 5.1 has no Test-Json and its
+    # ConvertFrom-Json is more lenient, so the structure checks below matter there.
+    if (Get-Command Test-Json -ErrorAction SilentlyContinue) {
+        if (-not (Test-Json -Json $text -ErrorAction SilentlyContinue)) { throw "$Path is not valid JSON." }
+    }
+    try   { $root = $text | ConvertFrom-Json -ErrorAction Stop }
+    catch { throw "$Path is not valid JSON: $($_.Exception.Message)" }
+
+    if ($root -isnot [pscustomobject])        { throw "$Path must contain a JSON object at the top level." }
+    if (@($root.PSObject.Properties).Count -eq 0) { throw "$Path contains no policies." }
+    return $root
+}
+
+# Turns the parsed policies into a list of { Name, Kind, Value } registry entries.
+# Unsupported values (null, floats, ...) are skipped with a warning; if nothing is
+# left the install is refused so an existing key is never replaced by an empty one.
+function ConvertTo-PolicyPlan {
+    param([Parameter(Mandatory)]$Root)
+
+    $plan = [System.Collections.Generic.List[object]]::new()
+    foreach ($policy in $Root.PSObject.Properties) {
+        $key   = $policy.Name
+        $value = $policy.Value
+        if ($value -is [bool]) {
+            $plan.Add([pscustomobject]@{ Name = $key; Kind = 'DWord'; Value = [int]$value })
+        } elseif ($value -is [int] -or $value -is [long]) {
+            if ($value -lt [int]::MinValue -or $value -gt [uint32]::MaxValue) {
+                Write-Warning "Skipping $key - $value is outside the REG_DWORD range"
+                continue
+            }
+            # Store the Int32 bit pattern so values above 2^31 are accepted on every PowerShell version.
+            $dword = if ($value -gt [int]::MaxValue) { [int]($value - 4294967296) } else { [int]$value }
+            $plan.Add([pscustomobject]@{ Name = $key; Kind = 'DWord'; Value = $dword })
+        } elseif ($value -is [string]) {
+            $plan.Add([pscustomobject]@{ Name = $key; Kind = 'String'; Value = $value })
+        } elseif ($value -is [array] -or $value -is [pscustomobject] -or $value -is [hashtable]) {
+            # Chromium dict/list policies are stored as JSON in a single REG_SZ.
+            # -InputObject prevents single-element arrays from being unrolled.
+            $json = ConvertTo-Json -InputObject $value -Depth 100 -Compress
+            $plan.Add([pscustomobject]@{ Name = $key; Kind = 'String'; Value = $json })
+        } else {
+            # null, floats, dates are not valid top-level policy values.
+            Write-Warning "Skipping $key - unsupported type"
+        }
+    }
+    if ($plan.Count -eq 0) { throw "no usable policies were found in policies.json." }
+    return ,$plan.ToArray()
+}
+
+# Compares a registry key against the plan. Returns a list of problems (empty = identical).
+function Test-PolicyKey {
+    param([Parameter(Mandatory)]$Plan, [Parameter(Mandatory)]$Key)
+
+    $problems = [System.Collections.Generic.List[string]]::new()
+    $names = @($Key.GetValueNames())
+    foreach ($n in $names) {
+        if ($Plan.Name -cnotcontains $n) { $problems.Add("unexpected value: $n") }
+    }
+    foreach ($e in $Plan) {
+        if ($names -cnotcontains $e.Name) { $problems.Add("missing value: $($e.Name)"); continue }
+        $kind = [string]$Key.GetValueKind($e.Name)
+        if ($kind -ne $e.Kind) { $problems.Add("$($e.Name): kind is $kind, expected $($e.Kind)"); continue }
+        $actual = $Key.GetValue($e.Name, $null, 'DoNotExpandEnvironmentNames')
+        if ($actual -cne $e.Value) { $problems.Add("$($e.Name): value does not match") }
+    }
+    return ,$problems.ToArray()
+}
+
+# Stage and verify the plan before replacing the live key; restore it if the swap fails.
+# Rename-Item performs a copy + delete, so the swap is not atomic.
+function Write-PolicyKey {
+    param([Parameter(Mandatory)][string]$RegPath, [Parameter(Mandatory)]$Plan)
+
+    $leaf  = $RegPath.Substring($RegPath.LastIndexOf('\') + 1)
+    $stage = "$RegPath.__new"
+    $old   = "$RegPath.__old"
+
+    foreach ($stale in @($stage, $old)) {
+        if (Test-Path $stale) { Remove-Item -Path $stale -Recurse -Force }
+    }
+
+    New-Item -Path $stage -Force | Out-Null
+    try {
+        foreach ($e in $Plan) {
+            Set-ItemProperty -Path $stage -Name $e.Name -Value $e.Value -Type $e.Kind -ErrorAction Stop
+        }
+        $problems = Test-PolicyKey -Plan $Plan -Key (Get-Item -Path $stage)
+        if ($problems.Count -gt 0) {
+            throw "verification failed: $($problems -join '; ')"
+        }
+    } catch {
+        Remove-Item -Path $stage -Recurse -Force -ErrorAction SilentlyContinue
+        throw
+    }
+
+    $hadLive = Test-Path $RegPath
+    $movedOld = $false
+    try {
+        if ($hadLive) { Rename-Item -Path $RegPath -NewName "$leaf.__old"; $movedOld = $true }
+        Rename-Item -Path $stage -NewName $leaf
+    } catch {
+        # Put the previous key back and drop the staging key
+        if ($movedOld -and (Test-Path $old) -and -not (Test-Path $RegPath)) {
+            try { Rename-Item -Path $old -NewName $leaf }
+            catch { Write-Warning "Could not restore the previous policies; they are still stored under $old" }
+        }
+        Remove-Item -Path $stage -Recurse -Force -ErrorAction SilentlyContinue
+        throw
+    }
+    if ($hadLive) { Remove-Item -Path $old -Recurse -Force }
 }
 
 # --- Parse selection input into browser names ---
@@ -116,11 +247,20 @@ if (-not (Test-Path $JsonPath)) {
     if ($confirm -notmatch "^[Yy]$") {
         Fail "Aborted."
     }
-    & $CurlBin -fsS -o $JsonPath $RemoteUrl
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $JsonPath)) {
-        if (Test-Path $JsonPath) { Remove-Item $JsonPath -Force }
+    # Download to a temp file and validate it first, so an HTTP error page, a captive-portal
+    # page or a truncated download never ends up as policies.json.
+    $DlTmp = Join-Path $ScriptDir (".policies.json." + [guid]::NewGuid().ToString("N") + ".tmp")
+    & $CurlBin -fsS -o $DlTmp $RemoteUrl
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $DlTmp)) {
+        if (Test-Path $DlTmp) { Remove-Item $DlTmp -Force }
         Fail "Error: Failed to fetch policies.json from remote."
     }
+    try { $null = Read-PolicyFile -Path $DlTmp }
+    catch {
+        Remove-Item $DlTmp -Force
+        Fail "Error: Downloaded file is not a usable policies.json: $($_.Exception.Message)"
+    }
+    Move-Item -Path $DlTmp -Destination $JsonPath -Force
     Write-Host "Fetched successfully."
 }
 
@@ -186,8 +326,13 @@ if ($action -eq "2") {
     }
 } else {
     # --- Install ---
-    $policies = Get-Content $JsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    try {
+        $plan = ConvertTo-PolicyPlan -Root (Read-PolicyFile -Path $JsonPath)
+    } catch {
+        Fail "Error: $($_.Exception.Message)", "       Nothing was changed."
+    }
 
+    $failed = $false
     foreach ($name in $selected) {
         $RegPath = $Targets[$name]
         Write-Host ""
@@ -207,48 +352,24 @@ if ($action -eq "2") {
                 Write-Host "[$name] Skipped."
                 continue
             }
-            Remove-Item -Path $RegPath -Recurse -Force
-            Write-Host "[$name] Cleared existing policies."
         }
 
-        New-Item -Path $RegPath -Force | Out-Null
-
-        $applied = 0
-        $skipped = 0
-
-        foreach ($policy in $policies.PSObject.Properties) {
-            $key   = $policy.Name
-            $value = $policy.Value
-            try {
-                $displayValue = $value
-                if ($value -is [bool]) {
-                    $dword = if ($value) { 1 } else { 0 }
-                    Set-ItemProperty -Path $RegPath -Name $key -Value $dword -Type DWord
-                } elseif ($value -is [int] -or $value -is [long]) {
-                    Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type DWord
-                } elseif ($value -is [string]) {
-                    Set-ItemProperty -Path $RegPath -Name $key -Value $value -Type String
-                } elseif ($value -is [array] -or $value -is [pscustomobject] -or $value -is [hashtable]) {
-                    # Chromium dict/list policies are stored as JSON in a single REG_SZ.
-                    # -InputObject prevents single-element arrays from being unrolled.
-                    $json = ConvertTo-Json -InputObject $value -Depth 100 -Compress
-                    Set-ItemProperty -Path $RegPath -Name $key -Value $json -Type String
-                    $displayValue = $json
-                } else {
-                    # null, floats are not valid top-level policy values.
-                    Write-Warning "Skipping $key - unsupported type"
-                    $skipped++
-                    continue
-                }
-                Write-Host " SET $key = $displayValue"
-                $applied++
-            } catch {
-                Write-Warning "Failed to set ${key}: $_"
-                $skipped++
-            }
+        try {
+            Write-PolicyKey -RegPath $RegPath -Plan $plan
+        } catch {
+            Write-Warning "[$name] Failed: $($_.Exception.Message) Existing policies were left in place."
+            $failed = $true
+            continue
         }
-        Write-Host "[$name] Done. $applied applied, $skipped skipped."
+        foreach ($e in $plan) { Write-Host " SET $($e.Name) = $($e.Value)" }
+        Write-Host "[$name] Done. $($plan.Count) applied."
         $changed = $true
+    }
+    if ($failed) {
+        Write-Host ""
+        Write-Host "One or more browsers failed - see warnings above."
+        if ($changed) { Write-Host "Restart your Chromium-based browser and verify at chrome://policy." }
+        exit 1
     }
 }
 
