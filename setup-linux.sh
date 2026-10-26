@@ -11,7 +11,7 @@ JSON_PATH="$SCRIPT_DIR/policies.json"
 
 SKIP=false
 
-# --- Optional JSON integrity check ---
+# --- Integrity check ---
 
 PYTHON_BIN=""
 for _py in python python3; do
@@ -24,9 +24,11 @@ for _py in python python3; do
 done
 unset _py _cand
 
-# Temp file used by the atomic install; always removed on exit or interruption.
+# Temp file and verified snapshot used by the atomic install; always removed on exit or interruption.
 tmp=""
-trap 'rm -f -- "${tmp:-}"' EXIT
+snap_dir=""
+snap=""
+trap 'rm -f -- "${tmp:-}"; [[ -n "${snap_dir:-}" ]] && rm -rf -- "$snap_dir"' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
@@ -233,22 +235,27 @@ case "$action" in
         ;;
 esac
 
-# --- JSON integrity check ---
-if [[ "$do_install" == true ]]; then
+verify_snapshot() {
+    [[ -n "$snap" ]] && return 0
+    snap_dir="$(mktemp -d)" || exit 1
+    snap="$snap_dir/policies.json"
+    if ! cp --reflink=auto -- "$JSON_PATH" "$snap"; then
+        echo "Error: could not read $JSON_PATH. Nothing was installed." >&2
+        exit 1
+    fi
+    echo ""
     if [[ -n "$PYTHON_BIN" ]]; then
-        if ! err="$(check_json "$JSON_PATH" 2>&1)"; then
-            echo "Error: JSON integrity check failed for $JSON_PATH: $err" >&2
+        if ! err="$(check_json "$snap" 2>&1)"; then
+            echo "Error: Integrity check failed for $JSON_PATH: $err" >&2
             echo "       Nothing was installed." >&2
             exit 1
         fi
-        echo ""
-        echo "JSON integrity check passed: policies.json is well-formed."
+        echo "Integrity check passed."
     else
-        echo ""
-        echo "Warning: Python 3 was not found, so NO JSON integrity check was performed." >&2
-        echo "         Installing anyway. Install Python 3 first if you want policies.json verified." >&2
+        echo "Warning: Python was not found, so no integrity check was performed." >&2
+        echo "         Installing anyway. Install Python first if you want policies.json verified." >&2
     fi
-fi
+}
 
 # --- Process each selected browser ---
 changed=false
@@ -294,15 +301,11 @@ for name in "${selected[@]}"; do
     fi
 
     # Install atomically
+    verify_snapshot
     mkdir -p "$policy_dir"
     tmp="$(mktemp "$policy_dir/.policies.json.XXXXXX")" || exit 1
-    if ! cp --reflink=auto -- "$JSON_PATH" "$tmp"; then
-        echo "Error: [$name] could not copy $JSON_PATH; existing policies left untouched." >&2
-        exit 1
-    fi
-    if [[ -n "$PYTHON_BIN" ]] && ! err="$(check_json "$tmp" 2>&1)"; then
-        echo "Error: [$name] integrity check failed: $err" >&2
-        echo "       Existing policies left untouched." >&2
+    if ! cp --reflink=auto -- "$snap" "$tmp"; then
+        echo "Error: [$name] could not write to $policy_dir; existing policies left untouched." >&2
         exit 1
     fi
     chmod 644 "$tmp"
