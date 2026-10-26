@@ -12,14 +12,23 @@ JSON_PATH="$SCRIPT_DIR/policies.json"
 SKIP=false
 
 # --- Optional JSON integrity check ---
+
 PYTHON_BIN=""
-for _py in python3 python; do
-    if command -v "$_py" &>/dev/null && "$_py" -c 'import sys; sys.exit(sys.version_info[0] < 3)' &>/dev/null; then
-        PYTHON_BIN="$_py"
+for _py in python python3; do
+    _cand="/usr/bin/$_py"
+    if [[ -x "$_cand" ]] \
+       && "$_cand" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 6) else 1)' &>/dev/null; then
+        PYTHON_BIN="$_cand"
         break
     fi
 done
-unset _py
+unset _py _cand
+
+# Temp file used by the atomic install; always removed on exit or interruption.
+tmp=""
+trap 'rm -f -- "${tmp:-}"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # check_json FILE -> 0 = well-formed, 1 = problem (reason on stdout). Requires PYTHON_BIN.
 # UTF-8 is forced, so the result does not depend on the caller's locale.
@@ -124,7 +133,7 @@ if [[ ! -f "$JSON_PATH" ]]; then
         exit 1
     fi
     # Download to a temp file first (and validate it when Python is available), so an HTTP
-    # error page, a captive-portal page or a truncated download never becomes the final file.
+    # error page, a captive-portal page or a truncated download never becomes policies.json
     dl_tmp="$(mktemp "$SCRIPT_DIR/.policies.json.XXXXXX")" || exit 1
     if ! curl -fsS -o "$dl_tmp" "$REMOTE_URL"; then
         rm -f "$dl_tmp"
@@ -284,10 +293,21 @@ for name in "${selected[@]}"; do
         fi
     fi
 
-    # Install
+    # Install atomically
     mkdir -p "$policy_dir"
-    cp --reflink=auto "$JSON_PATH" "$policy_dest"
-    chmod 644 "$policy_dest"
+    tmp="$(mktemp "$policy_dir/.policies.json.XXXXXX")" || exit 1
+    if ! cp --reflink=auto -- "$JSON_PATH" "$tmp"; then
+        echo "Error: [$name] could not copy $JSON_PATH; existing policies left untouched." >&2
+        exit 1
+    fi
+    if [[ -n "$PYTHON_BIN" ]] && ! err="$(check_json "$tmp" 2>&1)"; then
+        echo "Error: [$name] integrity check failed: $err" >&2
+        echo "       Existing policies left untouched." >&2
+        exit 1
+    fi
+    chmod 644 "$tmp"
+    mv -f -- "$tmp" "$policy_dest"
+    tmp=""
 
     echo "[$name] Installed: $policy_dest"
     changed=true
