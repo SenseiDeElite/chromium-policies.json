@@ -75,13 +75,54 @@ declare -A POLICY_DIRS
 POLICY_DIRS["Google Chrome"]="/etc/opt/chrome/policies/managed"
 POLICY_DIRS["Chromium"]="/etc/chromium/policies/managed"
 POLICY_DIRS["Ungoogled Chromium"]="/etc/chromium/policies/managed"
-POLICY_DIRS["Microsoft Edge"]="/etc/opt/microsoft/msedge/policies/managed"
+POLICY_DIRS["Microsoft Edge"]="/etc/opt/edge/policies/managed"
 POLICY_DIRS["Vivaldi"]="/etc/chromium/policies/managed"
 POLICY_DIRS["Brave"]="/etc/brave/policies/managed"
 POLICY_DIRS["Yandex Browser"]="/etc/opt/yandex/browser/policies/managed"
 POLICY_DIRS["Cromite"]="/etc/cromite/policies/managed"
 POLICY_DIRS["Helium"]="/etc/chromium/policies/managed"
 POLICY_DIRS["Thorium"]="/etc/chromium/policies/managed"
+
+# --- Package formats ---
+# Native packages use POLICY_DIRS above. Flatpak and Snap builds are sandboxed and need their own
+# locations. A browser that is missing from a table below has no known way to load policies in that
+# format and is skipped (see the README for why).
+FORMAT_LABELS=("Native" "Flatpak" "Snap")
+FORMAT_KEYS=(native flatpak snap)
+
+# Flatpak: Chromium and Ungoogled Chromium read policies from extension point v1. An unmanaged
+# extension directory under /var/lib/flatpak/extension is discovered without installing an extension.
+# Architecture-specific paths are resolved by resolve_flatpak_dirs after Flatpak selection.
+# Chrome, Edge, and Brave expose host /etc via --filesystem=host-etc and link the host policy
+# directory into the sandbox, so they use the native policy path.
+FLATPAK_EXT_ROOT="/var/lib/flatpak/extension"
+FLATPAK_EXT_ID="chromium-policies-json"
+
+declare -A FLATPAK_POLICY_DIRS
+FLATPAK_POLICY_DIRS["Google Chrome"]="/etc/opt/chrome/policies/managed"
+FLATPAK_POLICY_DIRS["Microsoft Edge"]="/etc/opt/edge/policies/managed"
+FLATPAK_POLICY_DIRS["Brave"]="/etc/brave/policies/managed"
+
+resolve_flatpak_dirs() {
+    local arch
+    if ! command -v flatpak &>/dev/null; then
+        echo "Error: flatpak is not installed, so the Flatpak policy paths cannot be determined." >&2
+        exit 1
+    fi
+    if ! arch="$(flatpak --default-arch)" || [[ -z "$arch" ]]; then
+        echo "Error: 'flatpak --default-arch' failed; cannot determine the Flatpak architecture." >&2
+        exit 1
+    fi
+    FLATPAK_POLICY_DIRS["Chromium"]="$FLATPAK_EXT_ROOT/org.chromium.Chromium.Extension.$FLATPAK_EXT_ID/$arch/1/policies/managed"
+    FLATPAK_POLICY_DIRS["Ungoogled Chromium"]="$FLATPAK_EXT_ROOT/io.github.ungoogled_software.ungoogled_chromium.Extension.$FLATPAK_EXT_ID/$arch/1/policies/managed"
+}
+
+# Snap: Canonical's Chromium snap reads $SNAP_DATA/policies/managed. $SNAP_DATA is /var/snap/chromium/<rev>
+# and "current" points to it. "current" must already exist (i.e. the snap is installed).
+declare -A SNAP_ROOTS
+SNAP_ROOTS["Chromium"]="/var/snap/chromium/current"
+declare -A SNAP_POLICY_DIRS
+SNAP_POLICY_DIRS["Chromium"]="${SNAP_ROOTS["Chromium"]}/policies/managed"
 
 # --- Usage ---
 usage() {
@@ -112,6 +153,9 @@ if [[ "${EUID:-"$(id -u)"}" -ne 0 ]]; then
     echo "       You can also try sudo-rs, doas, pkexec, sudo and su if run0 (systemd) isn't available." >&2
     exit 1
 fi
+
+# Directories created below (including under /var/snap) must be readable by the browser's user.
+umask 022
 
 # --- Resolve policies.json ---
 if [[ ! -f "$JSON_PATH" ]]; then
@@ -158,7 +202,7 @@ if [[ ! -f "$JSON_PATH" ]]; then
     exit 1
 fi
 
-# --- Parse selection input into browser names ---
+# --- Parse selection input into 1-based indices (deduplicated, order preserved) ---
 # Accepts: single (1), comma-separated (1,2), ranges (1-3), or mixed (1,2-4).
 parse_selection() {
     local input="$1"
@@ -195,7 +239,7 @@ parse_selection() {
     for idx in "${indices[@]}"; do
         if [[ -z "${seen[$idx]+x}" ]]; then
             seen[$idx]=1
-            echo "${BROWSER_NAMES[$((idx-1))]}"
+            echo "$idx"
         fi
     done
 }
@@ -208,16 +252,44 @@ for i in "${!BROWSER_NAMES[@]}"; do
     echo " [$((i+1))] ${BROWSER_NAMES[$i]}"
 done
 echo ""
-echo "Note: Chromium, Ungoogled Chromium, Vivaldi, Helium and Thorium share"
-echo "      /etc/chromium/policies/managed, so changes apply to all of them."
+echo "Note: For native packages, Chromium, Ungoogled Chromium, Vivaldi, Helium and Thorium"
+echo "      share /etc/chromium/policies/managed, so changes apply to all of them."
 echo ""
 read -r -p "Target browser(s): " browser_input </dev/tty
 
-mapfile -t selected < <(parse_selection "$browser_input" "${#BROWSER_NAMES[@]}")
-if [[ ${#selected[@]} -eq 0 ]]; then
+mapfile -t browser_idx < <(parse_selection "$browser_input" "${#BROWSER_NAMES[@]}")
+if [[ ${#browser_idx[@]} -eq 0 ]]; then
     echo "No valid selection. Aborting." >&2
     exit 1
 fi
+selected=()
+for idx in "${browser_idx[@]}"; do
+    selected+=("${BROWSER_NAMES[$((idx-1))]}")
+done
+
+# --- Package format selection ---
+echo ""
+echo "Package format"
+for i in "${!FORMAT_LABELS[@]}"; do
+    echo " [$((i+1))] ${FORMAT_LABELS[$i]}"
+done
+echo ""
+echo "Note: Flatpak and Snap are only available for some browsers; the others are skipped."
+echo "      Several formats can be selected at once (for example 1,2)."
+echo ""
+read -r -p "Package format(s) [1]: " format_input </dev/tty
+format_input="${format_input:-1}"
+
+mapfile -t format_idx < <(parse_selection "$format_input" "${#FORMAT_KEYS[@]}")
+if [[ ${#format_idx[@]} -eq 0 ]]; then
+    echo "No valid selection. Aborting." >&2
+    exit 1
+fi
+formats=()
+for idx in "${format_idx[@]}"; do
+    formats+=("${FORMAT_KEYS[$((idx-1))]}")
+    [[ "${FORMAT_KEYS[$((idx-1))]}" == flatpak ]] && resolve_flatpak_dirs
+done
 
 # --- Action selection ---
 echo ""
@@ -257,15 +329,57 @@ verify_snapshot() {
     fi
 }
 
+# format_label NAME FORMAT -> label used in messages
+format_label() {
+    case "$2" in
+        flatpak) echo "$1 (Flatpak)" ;;
+        snap)    echo "$1 (Snap)" ;;
+        *)       echo "$1" ;;
+    esac
+}
+
+# prune_empty_dirs DIR STOP -> remove DIR and its parents while empty, never touching STOP or above.
+prune_empty_dirs() {
+    local dir="$1" stop="$2"
+    while [[ "$dir" == "$stop"/* ]]; do
+        rmdir -- "$dir" 2>/dev/null || break
+        dir="$(dirname -- "$dir")"
+    done
+}
+
 # --- Process each selected browser ---
 changed=false
 declare -A processed=()
-for name in "${selected[@]}"; do
-    policy_dir="${POLICY_DIRS[$name]}"
-    policy_dest="$policy_dir/policies.json"
+for fmt in "${formats[@]}"; do
+for browser in "${selected[@]}"; do
+    name="$(format_label "$browser" "$fmt")"
+    prune_stop=""
+    snap_root=""
+    case "$fmt" in
+        native)  policy_dir="${POLICY_DIRS[$browser]:-}" ;;
+        flatpak) policy_dir="${FLATPAK_POLICY_DIRS[$browser]:-}"
+                 [[ "$policy_dir" == "$FLATPAK_EXT_ROOT"/* ]] && prune_stop="$FLATPAK_EXT_ROOT" ;;
+        snap)    policy_dir="${SNAP_POLICY_DIRS[$browser]:-}"
+                 snap_root="${SNAP_ROOTS[$browser]:-}" ;;
+    esac
+
+    if [[ -z "$policy_dir" ]]; then
+        echo ""
+        echo "[$name] Not supported – skipped."
+        continue
+    fi
 
     echo ""
     echo "Processing $name..."
+
+    # A Snap policy directory must only be created inside an installed snap: if "current" is missing,
+    # mkdir -p would create a real directory where snapd expects its symlink.
+    if [[ "$fmt" == snap && "$do_install" == true && ! -e "$snap_root" ]]; then
+        echo "[$name] Snap is not installed ($snap_root does not exist) – skipped."
+        continue
+    fi
+
+    policy_dest="$policy_dir/policies.json"
 
     # Several browsers share one policy file; only handle each file once per run
     if [[ -n "${processed[$policy_dest]+x}" ]]; then
@@ -287,6 +401,8 @@ for name in "${selected[@]}"; do
         fi
         rm -f "$policy_dest"
         echo "[$name] Removed: $policy_dest"
+        # Drop the Flatpak extension directories this script created, if now empty.
+        [[ -n "$prune_stop" ]] && prune_empty_dirs "$policy_dir" "$prune_stop"
         changed=true
         continue
     fi
@@ -303,6 +419,10 @@ for name in "${selected[@]}"; do
     # Install atomically
     verify_snapshot
     mkdir -p "$policy_dir"
+    # Directories must be root-owned and world-readable (not writable) so the sandboxed browser can read them.
+    if [[ "$fmt" == snap ]]; then
+        chmod 755 "$snap_root/policies" "$policy_dir"
+    fi
     tmp="$(mktemp "$policy_dir/.policies.json.XXXXXX")" || exit 1
     if ! cp --reflink=auto -- "$snap" "$tmp"; then
         echo "Error: [$name] could not write to $policy_dir; existing policies left untouched." >&2
@@ -314,6 +434,7 @@ for name in "${selected[@]}"; do
 
     echo "[$name] Installed: $policy_dest"
     changed=true
+done
 done
 
 if [[ "$changed" == true ]]; then
