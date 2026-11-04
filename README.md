@@ -41,23 +41,26 @@ The current template covers:
 
 Each setup script lists these browsers in the same order. Browsers that read the same location share a single policy file, key or plist, so applying policies to one applies them to all of its siblings.
 
-| Browser            | Linux | Windows | macOS |
-| ------------------ | :---: | :-----: | :---: |
-| Google Chrome      |   ☑️   |    ☑️    |   ☑️   |
-| Chromium           |   ☑️   |    ☑️    |   ☑️   |
-| Ungoogled Chromium |   ☑️   |    ☑️    |   ☑️   |
-| Microsoft Edge     |   ☑️   |    ☑️    |   ☑️   |
-| Vivaldi            |   ☑️   |    ☑️    |   ☑️   |
-| Brave              |   ☑️   |    ☑️    |   ☑️   |
-| Yandex Browser     |   ☑️   |    ☑️    |   ☑️   |
-| Cromite            |   ☑️   |    ☑️    |   ❌   |
-| Helium             |   ☑️   |    ☑️    |   ☑️   |
-| Thorium            |   ☑️   |    ☑️    |   ☑️   |
+| Browser            | Linux | Flatpak | Snap | Windows | macOS |
+| ------------------ | :---: | :-----: | :--: | :-----: | :---: |
+| Google Chrome      |   Yes   |    Yes    |  N/A  |    Yes    |   Yes   |
+| Chromium           |   Yes   |    Yes    |  Yes   |    Yes    |   Yes   |
+| Ungoogled Chromium |   Yes   |    Yes    |  N/A  |    Yes    |   Yes   |
+| Microsoft Edge     |   Yes   |    Yes    |  N/A  |    Yes    |   Yes   |
+| Vivaldi            |   Yes   |    No    |  No  |    Yes    |   Yes   |
+| Brave              |   Yes   |    Yes    |  No  |    Yes    |   Yes   |
+| Yandex Browser     |   Yes   |    No    |  N/A  |    Yes    |   Yes   |
+| Cromite            |   Yes   |    N/A    |  N/A  |    Yes    |   N/A   |
+| Helium             |   Yes   |    N/A    |  N/A  |    Yes    |   Yes   |
+| Thorium            |   Yes   |    N/A    |  N/A  |    Yes    |   Yes   |
 
-- **Cromite** has no macOS build, so it is not offered by `setup-macos.sh`.
-- **Linux –** Chromium, Ungoogled Chromium, Vivaldi, Helium and Thorium all use `/etc/chromium/policies/managed`.
-- **Windows –** Chromium, Ungoogled Chromium, Helium and Thorium all use `HKLM\SOFTWARE\Policies\Chromium`. Vivaldi has its own key.
-- **macOS –** Chromium and Ungoogled Chromium share one bundle ID (`org.chromium.Chromium`) and therefore one plist. Every other browser has its own.
+- **Linux –** Native packages Chromium, Ungoogled Chromium, Vivaldi, Helium and Thorium all use `/etc/chromium/policies/managed`.
+- **Flatpak:**
+  - **Chromium** and **Ungoogled Chromium** only read policies through a Flatpak extension point. The script writes to `/var/lib/flatpak/extension/<app-id>.Extension.chromium-policies-json/<arch>/1/policies/managed`, which Flatpak picks up as an unmanaged extension.
+  - **Google Chrome**, **Microsoft Edge** and **Brave** have `--filesystem=host-etc` and a launcher that links the host's policy directory into the sandbox, so they read their respective host paths.
+- **Snap –** only Chromium is supported, through `/var/snap/chromium/current/policies/managed` (created root-owned, mode `755`). The script skips it if `/var/snap/chromium/current` doesn't exist.
+- **Windows –** Chromium, Ungoogled Chromium, Helium and Thorium all use `HKLM\SOFTWARE\Policies\Chromium`.
+- **macOS –** Chromium and Ungoogled Chromium share one bundle ID (`org.chromium.Chromium`) and therefore one plist.
 
 Policies that a given browser doesn't implement are simply ignored by it.
 
@@ -76,6 +79,8 @@ run0 ./setup-linux.sh
 ```
 
 You can also try `sudo-rs`, `doas`, `pkexec`, `sudo` and `su` if `run0` (systemd) isn't available.
+
+After choosing the browser(s), the script asks for the package format: native (default), Flatpak, Snap, or multiple at once. Unsupported browser/format combinations are skipped.
 
 #### 🪟 Windows
 Run the interactive setup script from an Administrator PowerShell session:
