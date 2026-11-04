@@ -1,4 +1,8 @@
 #!/usr/bin/env zsh
+
+# This source code is licensed under the MIT License.
+# See the full license text: https://github.com/SenseiDeElite/chromium-policies.json/blob/main/LICENSE
+
 # setup-macos.sh – Apply or remove chromium-policies.json on macOS.
 # Must be run with elevated privileges: sudo ./setup-macos.sh
 # Note: Cromite has no macOS build, so it is intentionally not listed.
