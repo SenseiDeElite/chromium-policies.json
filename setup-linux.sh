@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+
+# This source code is licensed under the MIT License.
+# See the full license text: https://github.com/SenseiDeElite/chromium-policies.json/blob/main/LICENSE
+
 # setup-linux.sh – Apply or remove chromium-policies.json on Linux.
 # Must be run with elevated privileges: run0 ./setup-linux.sh 
 # You can also try sudo-rs, doas, pkexec, sudo and su if run0 (systemd) isn't available.
