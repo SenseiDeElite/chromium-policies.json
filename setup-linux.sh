@@ -275,7 +275,7 @@ for i in "${!FORMAT_LABELS[@]}"; do
 done
 echo ""
 echo "Note: Flatpak and Snap are only available for some browsers; the others are skipped."
-echo "      Several formats can be selected at once (for example 1,2)."
+echo "      Several formats can be selected at once."
 echo ""
 read -r -p "Package format(s) [1]: " format_input </dev/tty
 format_input="${format_input:-1}"
