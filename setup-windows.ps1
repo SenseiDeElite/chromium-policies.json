@@ -1,3 +1,6 @@
+# This source code is licensed under the MIT License.
+# See the full license text: https://github.com/SenseiDeElite/chromium-policies.json/blob/main/LICENSE
+
 # setup-windows.ps1 – Apply or remove chromium-policies.json on Windows.
 # Must be run from an Administrator PowerShell session.
 
