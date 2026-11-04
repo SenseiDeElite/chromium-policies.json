@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="/icons/Chromium_Logo.svg" alt="Chromium logo" width="120" />
+  <img src="/assets/Chromium_Logo.svg" alt="Chromium logo" width="120" />
 </p>
 
 <h1 align="center">chromium-policies.json</h1>
