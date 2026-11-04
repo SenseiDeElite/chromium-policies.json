@@ -202,7 +202,7 @@ if [[ ! -f "$JSON_PATH" ]]; then
     exit 1
 fi
 
-# --- Parse selection input into 1-based indices (deduplicated, order preserved) ---
+# --- Parse selection input into 1-based indices ---
 # Accepts: single (1), comma-separated (1,2), ranges (1-3), or mixed (1,2-4).
 parse_selection() {
     local input="$1"
