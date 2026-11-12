@@ -8,7 +8,7 @@
   "AlwaysOpenPdfExternally": false,
   "AudioSandboxEnabled": true,
   "AuthSchemes": "negotiate",
-  "AutofillPredictionSettings": 2,
+  "AutofillGenAiSettings": 2,
   "AutofillSettings": [
     {
       "url_pattern": "*",
@@ -84,7 +84,6 @@
   "PromotionsEnabled": false,
   "PromptForDownloadLocation": true,
   "QuicAllowed": true,
-  "ReduceAcceptLanguageEnabled": true,
   "RelaunchNotification": 2,
   "RemoteAccessHostAllowClientPairing": false,
   "RemoteAccessHostAllowFileTransfer": false,
